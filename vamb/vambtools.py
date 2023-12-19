@@ -267,6 +267,11 @@ class FastaEntry:
         _kmercounts(self.sequence, k, counts)
         return counts
 
+    def pcmercounts(self, k: int) -> _np.ndarray:
+        counts = np.zeros(3 * (1 <<  k), dtype=_np.int32)
+        _pcmercounts(self.sequence, k, counts)
+        return counts
+
 
 def byte_iterfasta(
     filehandle: Iterable[bytes], comment: bytes = b"#"
@@ -648,3 +653,51 @@ def binsplit(
     for binname, headers in clusters:
         for newbinname, splitheaders in _split_bin(binname, headers, separator):
             yield newbinname, splitheaders
+
+def _load_jgi(filehandle, minlength, refhash):
+    "This function can be merged with load_jgi below in the next breaking release (post 3.0)"
+    header = next(filehandle)
+    fields = header.strip().split('\t')
+    if not fields[:3] == ["contigName", "contigLen", "totalAvgDepth"]:
+        raise ValueError('Input file format error: First columns should be "contigName,"'
+        '"contigLen" and "totalAvgDepth"')
+
+    columns = tuple([i for i in range(3, len(fields)) if not fields[i].endswith("-var")])
+    array = PushArray(np.float32)
+    identifiers = list()
+
+    for row in filehandle:
+        fields = row.split('\t')
+        if int(fields[1]) < minlength:
+            continue
+
+        for col in columns:
+            array.append(float(fields[col]))
+
+        identifiers.append(fields[0])
+
+    if refhash is not None:
+        hash = hash_refnames(identifiers)
+        if hash != refhash:
+            errormsg = ('JGI file has reference hash {}, expected {}. '
+                        'Verify that all BAM headers and FASTA headers are '
+                        'identical and in the same order.')
+            raise ValueError(errormsg.format(hash.hex(), refhash.hex()))
+
+    result = array.take()
+    result.shape = (len(result) // len(columns), len(columns))
+    return validate_input_array(result)
+
+def _load_jgi(filehandle):
+    """Load depths from the --outputDepth of jgi_summarize_bam_contig_depths.
+    See https://bitbucket.org/berkeleylab/metabat for more info on that program.
+
+    Usage:
+        with open('/path/to/jgi_depths.tsv') as file:
+            depths = load_jgi(file)
+    Input:
+        File handle of open output depth file
+    Output:
+        N_contigs x N_samples Numpy matrix of dtype float32
+    """
+    return load_jgi(filehandle, 0, None)
