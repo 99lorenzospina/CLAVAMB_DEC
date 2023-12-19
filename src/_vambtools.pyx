@@ -36,7 +36,7 @@ cpdef void _kmercounts(unsigned char[::1] bytesarray, int k, int[::1] counts):
     """Count tetranucleotides of contig and put them in counts vector.
 
     The bytearray is expected to be np.uint8 of bytevalues of the contig.
-    Only values 64, 67, 71, 84 are accepted, all others are skipped.
+    Only values 65, 67, 71, 84 are accepted, all others are skipped.
     The counts is expected to be an array of 4^k 32-bit integers with value 0.
     """
 
@@ -75,3 +75,81 @@ cpdef void _kmercounts(unsigned char[::1] bytesarray, int k, int[::1] counts):
             counts[kmer] += 1
         else:
             countdown -= 1
+
+cpdef void _pcmercounts(unsigned char[::1] bytesarray, int k, int[::1] counts):
+    """Compute of contig and put them in counts vector.
+
+    The bytearray is expected to be np.uint8 of bytevalues of the contig.
+    Only values 65, 67, 71, 84 are accepted, all others are skipped.
+    The counts is expected to be an array of 3*2^k 32-bit integers with value 0.
+    A is 0, C is 1, G is 2, T and U are 3
+    """
+
+    cdef int character, charvalue, i
+    cdef int contiglength = len(bytesarray)
+    cdef unsigned char* lut = [
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #15
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #31
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #47
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #63
+        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4, #79
+        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #95
+        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4, #111
+        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, #127
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    ]
+
+    cdef double prev = 0.5
+    cdef int current = 0
+    cdef int cgr = 0
+    cdef unsigned int maxvalue = (1<<k)
+
+    for i in range(contiglength):
+        character = bytesarray[i]
+        charvalue = lut[character]
+
+        if charvalue == 1 or charvalue == 3:
+            cgr=maxvalue
+        if charvalue == 0 or charvalue == 2:
+            cgr=0
+        prev=0.5*(prev+cgr)
+        current=int(prev)
+        prev=current
+        counts[current]=counts[current]+1
+
+    prev = 0.5
+
+    for i in range(contiglength):
+        character = bytesarray[i]
+        charvalue = lut[character]
+
+        if charvalue == 1 or charvalue == 0:
+            cgr=maxvalue
+        if charvalue == 3 or charvalue == 2:
+            cgr=0
+        prev=0.5*(prev+cgr)
+        current=int(prev)
+        prev=current
+        counts[current+maxvalue]=counts[current+maxvalue]+1
+
+    prev = 0.5
+
+    for i in range(contiglength):
+        character = bytesarray[i]
+        charvalue = lut[character]
+
+        if charvalue == 1 or charvalue == 2:
+            cgr=maxvalue
+        if charvalue == 0 or charvalue == 3:
+            cgr=0
+        prev=0.5*(prev+cgr)
+        current=int(prev)
+        prev=current
+        counts[current+(maxvalue<<1)]=counts[current+(maxvalue<<1)]+1
