@@ -304,7 +304,7 @@ def trainaae(
             aae = AAE.load(modelpath,cuda=cuda,c=True)
             aae.to(('cuda' if cuda else 'cpu'))
     else:
-        aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=True)
+        aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=False)
         log("Created AAE", logfile, 1)
         modelpath = os.path.join(outdir, 'aae_model.pt')
         aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
@@ -439,7 +439,8 @@ def run(
     outdir: str,
     fastapath: Optional[str],
     k: int,
-    contrastive: bool,
+    contrastive_vae: bool,
+    contrastive_aae: bool,
     augmode: list[int],
     augdatashuffle: bool,
     augmentationpath: Optional[str],
@@ -534,7 +535,7 @@ def run(
             abundance.matrix,
             composition.matrix,
             k,
-            contrastive,
+            contrastive_vae,
             augmode,
             augdatashuffle,
             augmentationpath,
@@ -563,7 +564,7 @@ def run(
             abundance.matrix,
             composition.matrix,
             k,
-            contrastive,
+            contrastive_aae,
             augmode,
             augdatashuffle,
             augmentationpath,
@@ -758,7 +759,8 @@ def main():
 
     # Contrastive learning arguments
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
-    contrastiveos.add_argument('--contrastive', action='store_true', help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
+    contrastiveos.add_argument('--contrastive_vae', action='store_true', help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
+    contrastiveos.add_argument('--contrastive_aae', action='store_true', help='Whether to perform contrastive learning(CLAMB) or not(AAMB). [False]')
     contrastiveos.add_argument('--augmode', metavar='', nargs = 2, type = int, default=[3, 3],
                         help='The augmentation method. Requires 2 int. specify -1 if trying all augmentation methods. Choices: 0 for gaussian noise, 1 for transition, 2 for transversion, 3 for mutation, -1 for all. [3, 3]')
     contrastiveos.add_argument('--augdatashuffle', action='store_true',
@@ -1035,7 +1037,7 @@ def main():
     maxclusters: Optional[int] = args.maxclusters
     separator: Optional[str] = args.separator
 
-    contrastive: bool = args.contrastive
+    contrastive: bool = (args.contrastive_vae) ^ (args.contrastive_aae)
     
     
     ######################### CHECK INPUT/OUTPUT FILES #####################
@@ -1235,7 +1237,8 @@ def main():
             outdir,
             fasta,
             args.k,
-            contrastive,
+            args.contrastive_vae,
+            args.contrastive_aae,
             args.augmode,
             args.augdatashuffle,
             augmentation_data_dir,
