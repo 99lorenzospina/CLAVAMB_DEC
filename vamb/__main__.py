@@ -313,7 +313,7 @@ def trainaae(
     log("Encoding to latent representation", logfile, 1)
     clusters_y_dict,latent = aae.get_latents(contignames, dataloader)
     vamb.vambtools.write_npz(os.path.join(outdir, "aae_z_latent.npz"), latent)
-    vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict)
+    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict)
 
     del aae  # Needed to free "latent" array's memory references?
 
@@ -438,13 +438,20 @@ def write_fasta(
 def run(
     outdir: str,
     fastapath: Optional[str],
-    compositionpath: Optional[str],  ## ??? 
+    k: int,
+    contrastive: bool,
+    augmode: list[int],
+    augdatashuffle: bool,
+    augmentationpath: Optional[str],
+    compositionpath: Optional[str],  ## ???
+    jgipath: Optional[str],
     bampaths: Optional[list[str]],  #
     rpkmpath: Optional[str],
     mincontiglength: int,
     norefcheck: bool,
     noencode: bool,
     minid: float,
+    temperature: float,
     nthreads: int,
     nhiddens: Optional[list[int]],
     nhiddens_aae: Optional[list[int]],
@@ -454,7 +461,7 @@ def run(
     nepochs: int,
     nepochs_aae: int,
     batchsize: int,
-    batchsize_aae: int,    
+    batchsize_aae: int,
     cuda: bool,
     alpha: Optional[float],
     beta: float,
@@ -475,12 +482,24 @@ def run(
     logfile: IO[str]
 ):
 
-    log("Starting Vamb version " + ".".join(map(str, vamb.__version__)), logfile)
+    if contrastive:
+        log('Starting ClAVAmb version ' + '.'.join(map(str, vamb.__version__)), logfile)
+    else:
+        log('Starting AVAmb version ' + '.'.join(map(str, vamb.__version__)), logfile)
     log("Date and time is " + str(datetime.datetime.now()), logfile, 1)
     begintime = time.time()/60
     
     # Get TNFs, save as npz
-    composition = calc_tnf(outdir, fastapath, compositionpath, mincontiglength, logfile)
+    composition = calc_tnf(outdir,
+                           fastapath,
+                           compositionpath,
+                           jgipath,
+                           mincontiglength,
+                           logfile,
+                           augmode=augmode,
+                           augmentation_store_dir=augmentationpath,
+                           contrastive=contrastive,
+                           k=k)
     
     
     # Parse BAMs, save as npz
@@ -488,6 +507,7 @@ def run(
         outdir,
         bampaths,
         rpkmpath,
+        jgipath,
         composition.metadata,
         not norefcheck,
         minid,
@@ -513,6 +533,11 @@ def run(
             outdir,
             abundance.matrix,
             composition.matrix,
+            k,
+            contrastive,
+            augmode,
+            augdatashuffle,
+            augmentationpath,
             composition.metadata.lengths,
             nhiddens,
             nlatent,
@@ -537,6 +562,12 @@ def run(
             outdir,
             abundance.matrix,
             composition.matrix,
+            k,
+            contrastive,
+            augmode,
+            augdatashuffle,
+            augmentationpath,
+            temperature,
             composition.metadata.lengths,
             nhiddens_aae,
             nlatent_aae_z,
@@ -550,7 +581,7 @@ def run(
             nepochs_aae,
             lrate,
             batchsteps_aae,
-            logfile,    
+            logfile,
             composition.metadata.identifiers,
         )
         fin_train_aae=time.time()/60
@@ -685,7 +716,7 @@ def run(
         log(f"\nAAE y bins written in {writing_bins_time_y} minutes", logfile)
       
 def main():
-    doc = f"""Avamb: Adversarial and Variational autoencoders for metagenomic binning.
+    doc = f"""CL-Avamb: Contrastive Learning - Adversarial and Variational autoencoders for metagenomic binning.
     
     Version: {'.'.join([str(i) for i in vamb.__version__])}
 
@@ -722,8 +753,19 @@ def main():
         title="TNF input (either fasta or all .npz files required)"
     )
     tnfos.add_argument("--fasta", metavar="", help="path to fasta file")
+    tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
 
+    # Contrastive learning arguments
+    contrastiveos = parser.add_argument_group(title='Contrastive learning input')
+    contrastiveos.add_argument('--contrastive', action='store_true', help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
+    contrastiveos.add_argument('--augmode', metavar='', nargs = 2, type = int, default=[3, 3],
+                        help='The augmentation method. Requires 2 int. specify -1 if trying all augmentation methods. Choices: 0 for gaussian noise, 1 for transition, 2 for transversion, 3 for mutation, -1 for all. [3, 3]')
+    contrastiveos.add_argument('--augdatashuffle', action='store_true',
+            help='Whether to shuffle the training augmentation data (True: For each training, random select the augmentation data from the augmentation dir pool.\n!!!BE CAUTIOUS WHEN TURNING ON [False])')
+    contrastiveos.add_argument('--augmentation', metavar='', help='path to augmentation dir. [outdir/augmentation]')
+    contrastiveos.add_argument('--temperature', metavar='', default=1, type=float, help='The temperature for the normalized temperature-scaled cross entropy loss. [1]')
+    
     # RPKM arguments
     rpkmos = parser.add_argument_group(
         title="RPKM input (either BAMs or .npz required)"
@@ -732,6 +774,7 @@ def main():
         "--bamfiles", metavar="", help="paths to (multiple) BAM files", nargs="+"
     )
     rpkmos.add_argument("--rpkm", metavar="", help="path to .npz of RPKM (abundances)")
+    rpkmos.add_argument('--jgi', metavar='', help='path to output of jgi_summarize_bam_contig_depths')
 
     # Optional arguments
     inputos = parser.add_argument_group(title="IO options", description=None)
@@ -780,6 +823,7 @@ def main():
         help="Output tnfs and abundances only, do not encode or cluster [False]",
         action="store_true",
     )
+    
     # Model selection argument
     model_selection = parser.add_argument_group(title='Model selection', description=None)
 
@@ -943,6 +987,7 @@ def main():
 
     outdir: str = os.path.abspath(args.outdir)
     fasta: Optional[str] = args.fasta
+    jgi: Optional[str] = args.jgi
     composition: Optional[str] = args.composition
     bamfiles: Optional[list[str]] = args.bamfiles
     rpkm: Optional[str] = args.rpkm
@@ -989,6 +1034,8 @@ def main():
     minsize: int = args.minsize
     maxclusters: Optional[int] = args.maxclusters
     separator: Optional[str] = args.separator
+
+    contrastive: bool = args.contrastive
     
     
     ######################### CHECK INPUT/OUTPUT FILES #####################
@@ -1012,10 +1059,49 @@ def main():
         if path is not None and not os.path.isfile(path):
             raise FileNotFoundError(path)
 
+    # Check the running mode (CLMB or VAMB)
+    if contrastive:
+        if args.augmentation is None:
+            augmentation_data_dir = os.path.join(args.outdir, 'augmentation')
+        else:
+            augmentation_data_dir = args.augmentation
+
+        augmentation_number = [0, 0]
+        aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
+
+        for i in range(2):
+            if args.augmode[i] == -1:
+                augmentation_number[i] = len(glob.glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*'))
+            elif 0<= args.augmode[i] <= 3:
+                augmentation_number[i] = len(glob.glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*_{aug_all_method[args.augmode[i]]}_*'))
+            else:
+                raise argparse.ArgumentTypeError('If contrastive learning is on, augmode must be int >-2 and <4')
+
+        if fasta is None:
+            warnings.warn("CLMB can't recognize the type of augmentation data, so please make sure your augmentation data in augmentation dir fit the augmode", UserWarning)
+            if augmentation_number[0] == 0 or augmentation_number[1] == 0:
+                raise argparse.ArgumentTypeError('Must specify either FASTA or the augmentation .npz inputs')
+            if (2 * augmentation_number[0]) ** 2 < args.nepochs or (2 * augmentation_number[1]) ** 2 < args.nepochs:
+                warnings.warn("Not enough augmentation, use replicated data in the training, which might decrease the performance", FutureWarning)
+        else:
+            if 0 < (2 * augmentation_number[0]) ** 2 < args.nepochs or 0 < (2 * augmentation_number[1]) ** 2 < args.nepochs:
+                warnings.warn("Not enough augmentation, regenerate the augmentation to maintain the performance, please use ctrl+C to stop this process in 20 seconds if you would not like the augmentation dir to be rewritten. \
+                    You can choose using the augmentations in the augmentation dir (without specifying --fasta) after interruptting this program, or continuing this program to erase the augmentation dir and regenerate the augmentation data", UserWarning)
+                for sleep_time in range(4):
+                    print(f'Program to be continued in {20-4*sleep_time}s, please use ctrl+C to stop this process if you would not like the augmentation dir to be rewritten')
+                    time.sleep(5)
+                warnings.warn("Not enough augmentation, regenerate the augmentation to maintain the performance, erasing the augmentation dir. We will regenerate the augmentation in the following function", UserWarning)
+                for erase_file in glob.glob(rf'{augmentation_data_dir+os.sep}pool*k{args.k}*'):
+                    print(f'removing {erase_file} ...')
+                    os.system(f'rm {erase_file}')
+
+    else:
+        augmentation_data_dir = os.path.join(args.outdir, 'augmentation')
+    
     # Make sure only one RPKM input is there
-    if not ((bamfiles is None) ^ (rpkm is None)):
+    if not ((bamfiles is None) ^ (rpkm is None) ^ (jgi is None)):
         raise argparse.ArgumentTypeError(
-            "Must specify exactly one of BAM files or RPKM input"
+            "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
 
     if rpkm is not None and not os.path.isfile(rpkm):
@@ -1148,13 +1234,20 @@ def main():
         run(
             outdir,
             fasta,
+            args.k,
+            contrastive,
+            args.augmode,
+            args.augdatashuffle,
+            augmentation_data_dir,
             composition,
+            jgi,
             bamfiles,
             rpkm,
             mincontiglength=minlength,
             norefcheck=norefcheck,
             noencode=noencode,
             minid=minid,
+            temperature = args.temperature,
             nthreads=nthreads,
             nhiddens=nhiddens,
             nhiddens_aae=nhiddens_aae,
