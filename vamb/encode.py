@@ -48,6 +48,7 @@ def make_dataloader(
     Inputs:
         rpkm: RPKM matrix (N_contigs x N_samples)
         tnf: TNF matrix (N_contigs x N_TNF)
+        lengths: matrix of lengths of each contig
         batchsize: Starting size of minibatches for dataloader
         destroy: Mutate rpkm and tnf array in-place instead of making a copy.
         cuda: Pagelock memory of dataloader (use when using GPU acceleration)
@@ -162,13 +163,16 @@ class VAE(_nn.Module):
 
     def __init__(
         self,
+        ntf: int, #103
         nsamples: int,
+        k: int = 4,
         nhiddens: Optional[list[int]] = None,
         nlatent: int = 32,
         alpha: Optional[float] = None,
         beta: float = 200.0,
         dropout: Optional[float] = 0.2,
         cuda: bool = False,
+        c: bool = False,
     ):
         if nlatent < 1:
             raise ValueError(f"Minimum 1 latent neuron, not {nlatent}")
@@ -203,12 +207,14 @@ class VAE(_nn.Module):
         # Initialize simple attributes
         self.usecuda = cuda
         self.nsamples = nsamples
-        self.ntnf = 103
+        self.ntnf = ntnf
+        self.k = k
         self.alpha = alpha
         self.beta = beta
         self.nhiddens = nhiddens
         self.nlatent = nlatent
         self.dropout = dropout
+        self.contrast = c
 
         # Initialize lists for holding hidden layers
         self.encoderlayers = _nn.ModuleList()
@@ -346,66 +352,124 @@ class VAE(_nn.Module):
         optimizer,
         batchsteps: list[int],
         logfile,
+        awl = None,
     ) -> _DataLoader[tuple[Tensor, Tensor, Tensor]]:
         self.train()
+        #VAMB
+        if hparams == argparse.Namespace():
+            epoch_loss = 0.0
+            epoch_kldloss = 0.0
+            epoch_sseloss = 0.0
+            epoch_celoss = 0.0
+     
+            for depths_in, tnf_in, weights in data_loader:
+                depths_in.requires_grad = True
+                tnf_in.requires_grad = True
+    
+                if self.usecuda:
+                    depths_in = depths_in.cuda()
+                    tnf_in = tnf_in.cuda()
+                    weights = weights.cuda()
+    
+                optimizer.zero_grad()
+    
+                depths_out, tnf_out, mu, logsigma = self(depths_in, tnf_in)
+    
+                loss, ce, sse, kld = self.calc_loss(
+                    depths_in, depths_out, tnf_in, tnf_out, mu, logsigma, weights
+                )
+    
+                loss.backward()
+                optimizer.step()
+    
+                epoch_loss += loss.data.item()
+                epoch_kldloss += kld.data.item()
+                epoch_sseloss += sse.data.item()
+                epoch_celoss += ce.data.item()
+    
+            if logfile is not None:
+                print(
+                    "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}".format(
+                        epoch + 1,
+                        epoch_loss / len(data_loader),
+                        epoch_celoss / len(data_loader),
+                        epoch_sseloss / len(data_loader),
+                        epoch_kldloss / len(data_loader),
+                        data_loader.batch_size,
+                    ),
+                    file=logfile,
+                )
+    
+                logfile.flush()
+        #CLMB
+        else:
+            epoch_loss = 0
+            epoch_kldloss = 0
+            epoch_cesseloss = 0
+            epoch_clloss = 0
+            # grad_block.clear()
+            for depths, tnf_in, tnf_aug1, tnf_aug2 in data_loader:
+                # print(_torch.sum(tnf_in1),tnf_in1.shape, file=logfile)
+                # depths_in1, tnf_in1, depths_in2, tnf_in2 = depths_in1[0], tnf_in1[0], depths_in2[0], tnf_in2[0]
+                depths.requires_grad = True
+                tnf_in.requires_grad = True
+                tnf_aug1.requires_grad = True
+                tnf_aug2.requires_grad = True
 
-        epoch_loss = 0.0
-        epoch_kldloss = 0.0
-        epoch_sseloss = 0.0
-        epoch_celoss = 0.0
+                if self.usecuda:
+                    depths = depths.cuda()
+                    tnf_in = tnf_in.cuda()
+                    tnf_aug1 = tnf_aug1.cuda()
+                    tnf_aug2 = tnf_aug2.cuda()
 
-        if epoch in batchsteps:
-            data_loader = _DataLoader(
-                dataset=data_loader.dataset,
-                batch_size=data_loader.batch_size * 2,  # type: ignore
-                shuffle=True,
-                drop_last=True,
-                num_workers=data_loader.num_workers,
-                pin_memory=data_loader.pin_memory,
-            )
+                optimizer.zero_grad()
 
-        for depths_in, tnf_in, weights in data_loader:
-            depths_in.requires_grad = True
-            tnf_in.requires_grad = True
+                depths_out, tnf_out, mu, logsigma = self(depths, tnf_in)
+                depths_out1, tnf_out_aug1, mu1, logsigma1 = self(depths, tnf_aug1)
+                depths_out2, tnf_out_aug2, mu2, logsigma2 = self(depths, tnf_aug2)
 
-            if self.usecuda:
-                depths_in = depths_in.cuda()
-                tnf_in = tnf_in.cuda()
-                weights = weights.cuda()
+                #loss3 = self.nt_xent_loss(_torch.cat((depths_out1, tnf_out1), 1), _torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)
+                loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature)
+                loss_contrast2 = self.nt_xent_loss(tnf_out_aug2, tnf_out, temperature=hparams.temperature)
+                loss_contrast3 = self.nt_xent_loss(tnf_out, tnf_out_aug1, temperature=hparams.temperature)
+                # _torch.concat((depths_out, tnf_out), 1)
+                # _torch.concat((depths_out1, tnf_out_aug1), 1)
+                # _torch.concat((depths_out2, tnf_out_aug2), 1)
+                loss1, ce1, sse1, kld1 = self.calc_loss(depths, depths_out, tnf_in, tnf_out, mu, logsigma)
+                # loss2, ce2, sse2, kld2 = self.calc_loss(depths, depths_out, tnf_in, tnf_out, mu, logsigma)
+                # loss3, ce3, sse3, kld3 = self.calc_loss(depths, depths_out, tnf_in, tnf_out, mu, logsigma)
 
-            optimizer.zero_grad()
+                # NOTE: Add weight to avoid gradient disappearance
+                # loss = awl(800*loss_contrast1, 800*loss_contrast2, 800*loss_contrast3) + 10000*loss1 + 2000*loss2 + 2000*loss3
+                loss = awl(hparams.sigma*loss_contrast1, hparams.sigma*loss_contrast2, hparams.sigma*loss_contrast3) + 10000*loss1
+                # loss = awl(awl_c(800*loss_contrast1, 800*loss_contrast2, 800*loss_contrast3), 10000*loss1, 2000*loss2, 2000*loss3)
+                loss.backward()
 
-            depths_out, tnf_out, mu, logsigma = self(depths_in, tnf_in)
+                optimizer.step()
+                print('loss', loss-10000*loss1,loss1,loss_contrast1,loss_contrast2,loss_contrast3,file=logfile)
 
-            loss, ce, sse, kld = self.calc_loss(
-                depths_in, depths_out, tnf_in, tnf_out, mu, logsigma, weights
-            )
+                epoch_loss += loss.data.item()
+                epoch_kldloss += (kld1).data.item()
+                epoch_cesseloss += (ce1).data.item()
+                epoch_clloss += (sse1).data.item()
 
-            loss.backward()
-            optimizer.step()
+            #Gradient monitor using hook (require extra memory and time cost)
+            #for i in range(len(grad_block)):
+            #     print('grad', grad_block[i], file=logfile, end='\t\t')
 
-            epoch_loss += loss.data.item()
-            epoch_kldloss += kld.data.item()
-            epoch_sseloss += sse.data.item()
-            epoch_celoss += ce.data.item()
-
-        if logfile is not None:
-            print(
-                "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}".format(
+            if logfile is not None:
+                print('\tEpoch: {}\tLoss: {:.6f}\tCL: {:.7f}\tCE SSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}'.format(
                     epoch + 1,
                     epoch_loss / len(data_loader),
-                    epoch_celoss / len(data_loader),
-                    epoch_sseloss / len(data_loader),
+                    epoch_clloss / len(data_loader),
+                    epoch_cesseloss / len(data_loader),
                     epoch_kldloss / len(data_loader),
                     data_loader.batch_size,
-                ),
-                file=logfile,
-            )
+                    ), file=logfile)
 
-            logfile.flush()
-
-        self.eval()
-        return data_loader
+                logfile.flush()
+                
+        return None
 
     def encode(self, data_loader) -> _np.ndarray:
         """Encode a data loader to a latent representation with VAE
@@ -474,7 +538,7 @@ class VAE(_nn.Module):
 
     @classmethod
     def load(
-        cls, path: Union[IO[bytes], str], cuda: bool = False, evaluate: bool = True
+        cls, path: Union[IO[bytes], str], cuda: bool = False, evaluate: bool = True, c: bool = False
     ):
         """Instantiates a VAE from a model file.
 
@@ -498,7 +562,7 @@ class VAE(_nn.Module):
         nlatent = dictionary["nlatent"]
         state = dictionary["state"]
 
-        vae = cls(nsamples, nhiddens, nlatent, alpha, beta, dropout, cuda)
+        vae = cls(nsamples, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
         vae.load_state_dict(state)
 
         if cuda:
@@ -517,6 +581,9 @@ class VAE(_nn.Module):
         batchsteps: Optional[list[int]] = [25, 75, 150, 300],
         logfile: Optional[IO[str]] = None,
         modelfile: Union[None, str, IO[bytes]] = None,
+        hparams = None,
+        augmentationpath = None,
+        mask = None
     ):
         """Train the autoencoder from depths array and tnf array.
 
@@ -527,6 +594,9 @@ class VAE(_nn.Module):
             batchsteps: None or double batchsize at these epochs [25, 75, 150, 300]
             logfile: Print status updates to this file if not None [None]
             modelfile: Save models to this file if not None [None]
+            hparams: CLMB only. Set the batchsize, augmode, temperature for contrastive learning. See the function (trainvae) in (__main.py__) for value setting. [None]
+            augmentationpath: CLMB only. Path to find the augmented data [None]
+            mask: CLMB only. Mask the augmented data to keep nonzero tnfs and rpkm [None]
 
         Output: None
         """
@@ -563,7 +633,7 @@ class VAE(_nn.Module):
         # Get number of features
         # Following line is un-inferrable due to typing problems with DataLoader
         ncontigs, nsamples = dataloader.dataset.tensors[0].shape  # type: ignore
-        optimizer = _Adam(self.parameters(), lr=lrate)
+        depthstensor, tnftensor = dataloader.dataset.tensors
 
         if logfile is not None:
             print("\tNetwork properties:", file=logfile)
@@ -587,10 +657,110 @@ class VAE(_nn.Module):
             print("\tN samples:", nsamples, file=logfile, end="\n\n")
 
         # Train
-        for epoch in range(nepochs):
-            dataloader = self.trainepoch(
-                dataloader, epoch, optimizer, sorted(batchsteps_set), logfile
-            )
+        # CLMB
+        if self.contrast:
+            '''Optimizer setting'''
+            awl = AutomaticWeightedLoss(3)
+            optimizer = _torch.optim.Adam([{'params':self.parameters(), 'lr':lrate}, {'params': awl.parameters(), 'lr':0.111, 'weight_decay': 0, 'eps': 1e-7}])
+            # for param in awl.parameters():
+            #     print('awl',type(param), param.size())
+            #Other optimizer options (not complemented)
+            # optimizer.add_param_group({'params': awl.parameters(),'lr':0.1, 'weight_decay': 0})
+            # print('optimizer',optimizer.param_groups)
+
+            '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
+            aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
+            augmentation_count_number = [0, 0]
+            augmentation_count_number[0] = len(glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*')) if hparams.augmode[0] == -1 else len(_glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*_{aug_all_method[hparams.augmode[0]]}_*'))
+            augmentation_count_number[1] = len(glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*')) if hparams.augmode[0] == -1 else len(_glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*_{aug_all_method[hparams.augmode[1]]}_*'))
+
+            if augmentation_count_number[0] > math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+                warnings.warn('Too many augmented data, augmented data might not be trained enough. CLMB do not know how this influence the performance', FutureWarning)
+            elif augmentation_count_number[0] < math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+                raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run VAMB')
+
+            '''Function for shuffling the augmented data (if needed)'''
+            def aug_file_shuffle(_count, _augmentationpath, _augdatashuffle=False):
+                _shuffle_file1 = random.randrange(0, sum(_count) - 1)
+                if _augdatashuffle:
+                    _aug_archive1_file = None if _shuffle_file1 < _count[0] else (glob(rf'{_augmentationpath+_os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_*') if hparams.augmode[0] == -1 \
+                            else glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[0]]}_*'))
+                else:
+                    _aug_archive1_file = glob(rf'{_augmentationpath+_os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_*') if hparams.augmode[0] == -1 \
+                            else glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_{aug_all_method[hparams.augmode[0]]}_*')
+                _shuffle_file2 = random.randrange(0, sum(_count) - 1)
+                if _augdatashuffle:
+                    _aug_archive2_file = None if _shuffle_file2 < _count[1] else (glob(rf'{_augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
+                            else glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[1]]}_*'))
+                else:
+                    _aug_archive2_file = glob(rf'{_augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
+                            else glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[1]]}_*')
+                return _aug_archive1_file, _aug_archive2_file
+
+
+            for epoch in range(nepochs):
+                aug_archive1_file = glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}_*index{epoch // augmentation_count_number[0]}_*') if hparams.augmode[0] == -1 \
+                        else glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}_*index{epoch // augmentation_count_number[0]}_{aug_all_method[hparams.augmode[0]]}_*')
+                aug_archive2_file = glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}_*index{epoch % augmentation_count_number[1]}_*') if hparams.augmode[1] == -1 \
+                        else glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}_*index{epoch % augmentation_count_number[1]}_{aug_all_method[hparams.augmode[1]]}_*')
+
+                '''If augdatashuffle in on, read augmentation data from shuffled-indexed files'''
+                if hparams.augdatashuffle:
+                    shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath, hparams.augdatashuffle)
+                    aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
+
+                '''Avoid training 2 same augmentation data'''
+                aug_tensor1, aug_tensor2 = 0, 0
+                while(_torch.sum(_torch.sub(aug_tensor1, aug_tensor2))==0):
+                    aug_arr1, aug_arr2 = _vambtools.read_npz(aug_archive1_file[0]), _vambtools.read_npz(aug_archive2_file[0])
+                    '''Mutate rpkm and tnf array in-place instead of making a copy.'''
+                    aug_arr1 = _vambtools.numpy_inplace_maskarray(aug_arr1, mask)
+                    aug_arr2 = _vambtools.numpy_inplace_maskarray(aug_arr2, mask)
+                    '''Zscore for augmentation data (same as the depth and tnf)'''
+                    _vambtools.zscore(aug_arr1, axis=0, inplace=True)
+                    _vambtools.zscore(aug_arr2, axis=0, inplace=True)
+                    aug_tensor1, aug_tensor2 = _torch.from_numpy(aug_arr1), _torch.from_numpy(aug_arr2)
+                    # print('augtensor', _torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
+                    # if aug_tensor1 == aug_tensor2, reloop
+                    shuffle_file1, shuffle_file2 = _aug_file_shuffle(augmentation_count_number, augmentationpath)
+                    aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
+                # print('difference',_torch.sum(_torch.sub(aug_tensor1, aug_tensor2), axis=1), _torch.sum(_torch.sub(aug_tensor1, aug_tensor2)))
+
+                '''Double the batchsize and decrease the learning rate by 0.8 for each batchstep'''
+                if epoch in batchsteps:
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] *= hparams.lrate_decent
+                        #if param_group['eps']==1e-7:
+                        #    param_group['lr'] *=1
+                        #else:
+                        #    param_group['lr'] *=1
+                    data_loader = _DataLoader(dataset=_TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
+                                        batch_size=dataloader.batch_size if epoch == 0 else data_loader.batch_size * 2,
+                                        shuffle=True, drop_last=False, num_workers=dataloader.num_workers, pin_memory=dataloader.pin_memory)
+                else:
+                    data_loader = _DataLoader(dataset=_TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
+                                        batch_size=dataloader.batch_size if epoch == 0 else data_loader.batch_size,
+                                        shuffle=True, drop_last=False, num_workers=dataloader.num_workers, pin_memory=dataloader.pin_memory)
+                self.trainepoch(data_loader, epoch, optimizer, batchsteps_set, logfile, hparams, awl)
+
+        # vamb
+        else:
+            optimizer = _torch.optim.Adam(self.parameters(), lr=lrate)
+            data_loader = _DataLoader(dataset=dataloader.dataset,
+                                    batch_size=dataloader.batch_size,
+                                    shuffle=True,
+                                    drop_last=False,
+                                    num_workers=dataloader.num_workers,
+                                    pin_memory=dataloader.pin_memory)
+            for epoch in range(nepochs):
+                if epoch in batchsteps:
+                    data_loader = _DataLoader(dataset=data_loader.dataset,
+                                        batch_size=data_loader.batch_size * 2,
+                                        shuffle=True,
+                                        drop_last=False,
+                                        num_workers=data_loader.num_workers,
+                                        pin_memory=data_loader.pin_memory)
+                self.trainepoch(data_loader, epoch, optimizer, batchsteps_set, logfile, argparse.Namespace())
 
         # Save weights - Lord forgive me, for I have sinned when catching all exceptions
         if modelfile is not None:
