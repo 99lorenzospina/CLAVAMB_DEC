@@ -8,6 +8,7 @@ vamb.parsebam
 vamb.encode
 vamb.cluster
 vamb.benchmark
+vamb.mimic
 
 General workflow:
 1) Filter contigs by size using vamb.vambtools.filtercontigs
@@ -17,11 +18,14 @@ General workflow:
 5) Train autoencoder using vamb.encode
 6) Cluster latent representation using vamb.cluster
 7) Split bins using vamb.vambtools
+
+Based on AVAMB v4 of Jakob Nybo Nissen and Simon Rasmussen, https://github.com/RasmussenLab/vamb
+and CLMB v1 of Pengfei Zhang, https://github.com/zpf0117b/CLMB
 """
 
-__authors__ = "Jakob Nybo Nissen", "Simon Rasmussen", "Lorenzo Spina"
+__authors__ = "Lorenzo Spina"
 __licence__ = "MIT"
-__version__ = (4, 0, 0, "DEV")
+__version__ = (1, 0, 0, "DEV")
 
 import sys as _sys
 
@@ -34,3 +38,4 @@ from . import parsecontigs
 from . import cluster
 from . import benchmark
 from . import encode
+from . import mimics
