@@ -26,14 +26,16 @@ np.random.seed(random_seed)
 class AAE(nn.Module):
     def __init__(
         self,
+        ntnf: int, #103
         nsamples: int,
-        nhiddens: int,
+        nhiddens: int, #but it should be a list!
         nlatent_l: int,
-        nlatent_y,
+        nlatent_y, #careful: nlatent_y should be the number of extimated clusters
         sl: float,
         slr: float,
         alpha: Optional[float],
         _cuda: bool,
+        contrast: bool = False,
     ):
         if nsamples is None:
             raise ValueError(
@@ -45,15 +47,16 @@ class AAE(nn.Module):
             alpha = 0.15 if nsamples > 1 else 0.50
 
         self.nsamples = nsamples
-        input_len = 103 + self.nsamples
+        self.ntnf = ntnf
         self.h_n = nhiddens
         self.ld = nlatent_l
         self.y_len = nlatent_y
-        self.input_len = int(input_len)
+        self.input_len = int(self.ntnf + self.nsamples)
         self.sl = sl
         self.slr = slr
         self.alpha = alpha
         self.usecuda = _cuda
+        self.contrast = contrast
 
         # encoder
         self.encoder = nn.Sequential(
@@ -161,6 +164,55 @@ class AAE(nn.Module):
     def _discriminator_y(self, y):
         return self.discriminator_y(y)
 
+    @classmethod
+    def load(cls, path, cuda=False, evaluate=True, c=False):
+      """Instantiates a AAE from a model file.
+      Inputs:
+          path: Path to model file as created by functions AAE.save or
+                AAE.trainmodel.
+          cuda: If network should work on GPU [False]
+          evaluate: Return network in evaluation mode [True]
+      Output: AAE with weights and parameters matching the saved network.
+      """
+
+      # Forcably load to CPU even if model was saves as GPU model
+      # dictionary = _torch.load(path, map_location=lambda storage, loc: storage)
+      dictionary = _torch.load(path)
+      nsamples = dictionary['nsamples']
+      alpha = dictionary['alpha']
+      beta = dictionary['beta']
+      dropout = dictionary['dropout']
+      nhiddens = dictionary['nhiddens']
+      nlatent = dictionary['nlatent']
+      state = dictionary['state']
+
+      aae = cls(nsamples, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
+      aae.load_state_dict(state)
+
+      if cuda:
+          aae.cuda()
+
+      if evaluate:
+          aae.eval()
+
+      return aae
+
+    def save(self, filehandle):
+        """Saves the AAE to a path or binary opened file. Load with AAE.load
+        Input: Path or binary opened filehandle
+        Output: None
+        """
+        state = {'nsamples': self.nsamples,
+                 'alpha': self.alpha,
+                 'beta': self.beta,
+                 'dropout': self.dropout,
+                 'nhiddens': self.nhiddens,
+                 'nlatent': self.nlatent,
+                 'state': self.state_dict(),
+                }
+
+        torch.save(state, filehandle)
+    
     def calc_loss(self, depths_in, depths_out, tnf_in, tnf_out):
         # If multiple samples, use cross entropy, else use SSE for abundance
         if self.nsamples > 1:
@@ -182,19 +234,354 @@ class AAE(nn.Module):
         d_z_latent = self._discriminator_z(z_latent)
         d_y_latent = self._discriminator_y(y_latent)
 
-        return mu, depths_out, tnfs_out, z_latent, y_latent, d_z_latent, d_y_latent
+        return mu, logvar, depths_out, tnfs_out, z_latent, y_latent, d_z_latent, d_y_latent
 
     # ----------
     #  Training
     # ----------
 
+    def trainepoch(self, data_loader, epoch, batchsteps, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, awl=None):
+        self.train()
+        (
+            ED_loss_e,
+            D_z_loss_e,
+            D_y_loss_e,
+            V_loss_e,
+            CE_e,
+            SSE_e,
+        ) = (0, 0, 0, 0, 0, 0)
+
+        total_batches_inthis_epoch = len(data_loader)
+        time_epoch_0 = time.time()
+
+        #AAMB
+        if hparams == Namespace():
+          for depths_in, tnf_in in data_loader:
+                depths_in.requires_grad = True
+                tnf_in.requires_grad = True
+
+
+                if self.usecuda:
+                  z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
+                  z_prior.cuda()
+                  ohc = RelaxedOneHotCategorical(
+                      torch.tensor([T], device="cuda"),
+                      torch.ones([nrows, self.y_len], device="cuda"),
+                  )
+                  y_prior = ohc.sample()
+                  y_prior = y_prior.cuda()
+
+                else:
+                    z_prior = Variable(
+                        Tensor(np.random.normal(0, 1, (nrows, self.ld)))
+                    )
+                    ohc = RelaxedOneHotCategorical(
+                        T, torch.ones([nrows, self.y_len])
+                    )
+                    y_prior = ohc.sample()
+
+                del ohc
+
+                if self.usecuda:
+                    depths_in = depths_in.cuda()
+                    tnf_in = tnf_in.cuda()
+
+                optimizer_E.zero_grad()
+                optimizer_D.zero_grad()
+
+                (
+                  mu,
+                  logvar,
+                  depths_out,
+                  tnfs_out,
+                  z_latent,
+                  y_latent,
+                  d_z_latent,
+                  d_y_latent,
+                  ) = self(depths_in, tnfs_in, z_prior, y_prior)
+
+                vae_loss, ce, sse = self.calc_loss(
+                  depths_in, depths_out, tnfs_in, tnfs_out
+                )
+                g_loss_adv_z = adversarial_loss(
+                    self._discriminator_z(z_latent), labels_prior
+                )
+                g_loss_adv_y = adversarial_loss(
+                    self._discriminator_y(y_latent), labels_prior
+                )
+
+                #Loss function L
+                ed_loss = (
+                    (1 - self.sl) * vae_loss
+                    + (self.sl * self.slr) * g_loss_adv_z
+                    + (self.sl * (1 - self.slr)) * g_loss_adv_y
+                )
+
+                ed_loss.backward()
+                optimizer_E.step
+                optimizer_D.step()
+
+                # ----------------------
+                #  Train Discriminator z
+                # ----------------------
+
+                optimizer_D_z.zero_grad()
+                mu, logvar = self._encode(depths_in, tnfs_in)[:2]
+                z_latent = self._reparameterization(mu, logvar)
+
+                d_z_loss_prior = adversarial_loss(
+                    self._discriminator_z(z_prior), labels_prior
+                )
+                d_z_loss_latent = adversarial_loss(
+                    self._discriminator_z(z_latent), labels_latent
+                )
+                d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
+
+                d_z_loss.backward()
+                optimizer_D_z.step()
+
+                # ----------------------
+                #  Train Discriminator y
+                # ----------------------
+
+                optimizer_D_y.zero_grad()
+                y_latent = self._encode(depths_in, tnfs_in)[2]
+                d_y_loss_prior = adversarial_loss(
+                    self._discriminator_y(y_prior), labels_prior
+                )
+                d_y_loss_latent = adversarial_loss(
+                    self._discriminator_y(y_latent), labels_latent
+                )
+                d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
+
+                d_y_loss.backward()
+                optimizer_D_y.step()
+
+                ED_loss_e += float(ed_loss.item())
+                loss_e += float(loss.item())
+                V_loss_e += float(vae_loss.item())
+                D_z_loss_e += float(d_z_loss.item())
+                D_y_loss_e += float(d_y_loss.item())
+                CE_e += float(ce.item())
+                SSE_e += float(sse.item())
+
+                time_epoch_1 = time.time()
+                time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+          if logfile is not None:
+                print(
+                    "\tEpoch: {}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
+                          epoch_i + 1,
+                          ED_loss_e / total_batches_inthis_epoch,
+                          V_loss_e / total_batches_inthis_epoch,
+                          CE_e / total_batches_inthis_epoch,
+                          SSE_e / total_batches_inthis_epoch,
+                          D_z_loss_e / total_batches_inthis_epoch,
+                          D_y_loss_e / total_batches_inthis_epoch,
+                          data_loader.batch_size,
+                          time_e,
+                    ), file=logfile)
+
+                logfile.flush()
+        #CLAMB
+        for depths_in, tnfs_in, tnf_aug1, tnf_aug2 in data_loader:  # weights currently unused here
+              nrows, _ = depths_in.shape
+
+              depths_in.requires_grad = True
+              tnfs_in.requires_grad = True
+              tnf_aug1.requires_grad = True
+              tnf_aug2.requires_grad = True
+
+              # Adversarial ground truths
+
+              labels_prior = Variable(
+                  Tensor(nrows, 1).fill_(1.0), requires_grad=False
+              )
+              labels_latent = Variable(
+                  Tensor(nrows, 1).fill_(0.0), requires_grad=False
+              )
+
+              # Sample noise as discriminator Z,Y ground truth
+
+              if self.usecuda:
+                  z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
+                  z_prior.cuda()
+                  ohc = RelaxedOneHotCategorical(
+                      torch.tensor([T], device="cuda"),
+                      torch.ones([nrows, self.y_len], device="cuda"),
+                  )
+                  y_prior = ohc.sample()
+                  y_prior = y_prior.cuda()
+
+              else:
+                  z_prior = Variable(
+                      Tensor(np.random.normal(0, 1, (nrows, self.ld)))
+                  )
+                  ohc = RelaxedOneHotCategorical(
+                      T, torch.ones([nrows, self.y_len])
+                  )
+                  y_prior = ohc.sample()
+
+              del ohc
+
+              if self.usecuda:
+                  depths_in = depths_in.cuda()
+                  tnfs_in = tnfs_in.cuda()
+                  tnf_aug1 = tnf_aug1.cuda()
+                  tnf_aug2 = tnf_aug2.cuda()
+
+              # -----------------
+              #  Train Generator
+              # -----------------
+              optimizer_E.zero_grad()
+              optimizer_D.zero_grad()
+              optimizer_awl.zero_grad()
+
+              # Forward pass
+              (
+                  mu,
+                  logvar,
+                  depths_out,
+                  tnfs_out,
+                  z_latent,
+                  y_latent,
+                  d_z_latent,
+                  d_y_latent,
+              ) = self(depths_in, tnfs_in, z_prior, y_prior)
+
+              mu1, logvar1, depths_out1, tnf_out_aug1, z_latent1, y_latent1, d_z_latent1, d_y_latent1 = self(depths_in, tnf_aug1, z_prior, y_prior)
+              mu2, logvar2, depths_out2, tnf_out_aug2, z_latent2, y_latent2, d_z_latent2, d_y_latent2 = self(depths_in, tnf_aug2, z_prior, y_prior)
+
+              loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature) #shouldn't be self.nt_xent_loss(_torch.cat((depths_out1, tnf_out1), 1), _torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)?
+              loss_contrast2 = self.nt_xent_loss(tnf_out_aug2, tnfs_out, temperature=hparams.temperature)
+              loss_contrast3 = self.nt_xent_loss(tnfs_out, tnf_out_aug1, temperature=hparams.temperature)
+
+              vae_loss, ce, sse = self.calc_loss(
+                  depths_in, depths_out, tnfs_in, tnfs_out
+              )
+              g_loss_adv_z = adversarial_loss(
+                  self._discriminator_z(z_latent), labels_prior
+              )
+              g_loss_adv_y = adversarial_loss(
+                  self._discriminator_y(y_latent), labels_prior
+              )
+
+              #Loss function L
+              ed_loss = (
+                  (1 - self.sl) * vae_loss
+                  + (self.sl * self.slr) * g_loss_adv_z
+                  + (self.sl * (1 - self.slr)) * g_loss_adv_y
+              )
+
+              #Final loss function with contrastive learning
+              # NOTE: Add weight to avoid gradient disappearance
+              loss = awl(hparams.sigma*loss_contrast1, hparams.sigma*loss_contrast2, hparams.sigma*loss_contrast3) + 10000*ed_loss
+
+              loss.backward()
+              optimizer_E.step()
+              optimizer_D.step()
+
+              optimizer_awl.step()
+
+              # ----------------------
+              #  Train Discriminator z
+              # ----------------------
+
+              optimizer_D_z.zero_grad()
+              mu, logvar = self._encode(depths_in, tnfs_in)[:2]
+              z_latent = self._reparameterization(mu, logvar)
+
+              d_z_loss_prior = adversarial_loss(
+                  self._discriminator_z(z_prior), labels_prior
+              )
+              d_z_loss_latent = adversarial_loss(
+                  self._discriminator_z(z_latent), labels_latent
+              )
+              d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
+
+              d_z_loss.backward()
+              optimizer_D_z.step()
+
+              # ----------------------
+              #  Train Discriminator y
+              # ----------------------
+
+              optimizer_D_y.zero_grad()
+              y_latent = self._encode(depths_in, tnfs_in)[2]
+              d_y_loss_prior = adversarial_loss(
+                  self._discriminator_y(y_prior), labels_prior
+              )
+              d_y_loss_latent = adversarial_loss(
+                  self._discriminator_y(y_latent), labels_latent
+              )
+              d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
+
+              d_y_loss.backward()
+              optimizer_D_y.step()
+
+              ED_loss_e += float(ed_loss.item())
+              loss_e += float(loss.item())
+              V_loss_e += float(vae_loss.item())
+              D_z_loss_e += float(d_z_loss.item())
+              D_y_loss_e += float(d_y_loss.item())
+              CE_e += float(ce.item())
+              SSE_e += float(sse.item())
+
+              time_epoch_1 = time.time()
+              time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+
+              if logfile is not None:
+                  print(
+                      "\tEpoch: {}\t Loss: {:.6f}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
+                          epoch_i + 1,
+                          loss_e / total_batches_inthis_epoch,
+                          ED_loss_e / total_batches_inthis_epoch,
+                          V_loss_e / total_batches_inthis_epoch,
+                          CE_e / total_batches_inthis_epoch,
+                          SSE_e / total_batches_inthis_epoch,
+                          D_z_loss_e / total_batches_inthis_epoch,
+                          D_y_loss_e / total_batches_inthis_epoch,
+                          data_loader.batch_size,
+                          time_e,
+                      ),
+                      file=logfile,
+                  )
+                  logfile.flush()
+
+        # save model
+        if modelfile is not None:
+            try:
+                checkpoint = {
+                    "state": self.state_dict(),
+                    "optimizer_E": optimizer_E.state_dict(),
+                    "optimizer_D": optimizer_D.state_dict(),
+                    "optimizer_D_z": optimizer_D_z.state_dict(),
+                    "optimizer_D_y": optimizer_D_y.state_dict(),
+                    "nsamples": self.num_samples,
+                    "alpha": self.alpha,
+                    "nhiddens": self.h_n,
+                    "nlatent_l": self.ld,
+                    "nlatent_y": self.y_len,
+                    "sl": self.sl,
+                    "slr": self.slr,
+                    "temp": self.T,
+                }
+                torch.save(checkpoint, modelfile)
+
+            except:
+                pass
+
+        return None
+    
     def trainmodel(
-        self, data_loader, nepochs, batchsteps, T, lr, logfile=None, modelfile=None
+        self, dataloader, nepochs=320, lrate=1e-3,
+                   batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None
     ):
 
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         batchsteps_set = set(batchsteps)
-        ncontigs, _ = data_loader.dataset.tensors[0].shape
+        # Get number of features
+        depthstensor, tnftensor = dataloader.dataset.tensors
+        ncontigs, nsamples = depthstensor.shape
 
         # Initialize generator and discriminator
 
@@ -242,193 +629,107 @@ class AAE(nn.Module):
         optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lr)
         optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lr)
 
-        for epoch_i in range(nepochs):
-            if epoch_i in batchsteps:
-                data_loader = _DataLoader(
-                    dataset=data_loader.dataset,
-                    batch_size=data_loader.batch_size * 2,
-                    shuffle=True,
-                    drop_last=True,
-                    num_workers=data_loader.num_workers,
-                    pin_memory=data_loader.pin_memory,
-                )
+        #Contrastive Learning
+        if contrastive:
+          awl = AutomaticWeightedLoss(3)
+          optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lr)
 
-            (
-                ED_loss_e,
-                D_z_loss_e,
-                D_y_loss_e,
-                V_loss_e,
-                CE_e,
-                SSE_e,
-            ) = (0, 0, 0, 0, 0, 0)
 
-            total_batches_inthis_epoch = len(data_loader)
-            time_epoch_0 = time.time()
+          '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
+          aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
+          augmentation_count_number = [0, 0]
+          augmentation_count_number[0] = len(glob(rf'{augmentationpath+os.sep}pool0*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+os.sep}pool0*k{self.k}*_{aug_all_method[hparams.augmode[0]]}_*'))
+          augmentation_count_number[1] = len(glob(rf'{augmentationpath+os.sep}pool1*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+os.sep}pool1*k{self.k}*_{aug_all_method[hparams.augmode[1]]}_*'))
 
-            for depths_in, tnfs_in, _ in data_loader:  # weights currently unused here
-                nrows, _ = depths_in.shape
+          if augmentation_count_number[0] > math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+              warnings.warn('Too many augmented data, augmented data might not be trained enough. CLAMB do not know how this influence the performance', FutureWarning)
+          elif augmentation_count_number[0] < math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+              raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run VAMB')
 
-                # Adversarial ground truths
 
-                labels_prior = Variable(
-                    Tensor(nrows, 1).fill_(1.0), requires_grad=False
-                )
-                labels_latent = Variable(
-                    Tensor(nrows, 1).fill_(0.0), requires_grad=False
-                )
+          '''Function for shuffling the augmented data (if needed)'''
+          def aug_file_shuffle(_count, _augmentationpath, _augdatashuffle=False):
+              _shuffle_file1 = random.randrange(0, sum(_count) - 1)
+              if _augdatashuffle:
+                  _aug_archive1_file = None if _shuffle_file1 < _count[0] else (glob(rf'{_augmentationpath+os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_*') if hparams.augmode[0] == -1 \
+                          else glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[0]]}_*'))
+              else:
+                  _aug_archive1_file = glob(rf'{_augmentationpath+os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_*') if hparams.augmode[0] == -1 \
+                          else glob(rf'{augmentationpath+os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_{aug_all_method[hparams.augmode[0]]}_*')
+              _shuffle_file2 = random.randrange(0, sum(_count) - 1)
+              if _augdatashuffle:
+                  _aug_archive2_file = None if _shuffle_file2 < _count[1] else (glob(rf'{_augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
+                          else glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[1]]}_*'))
+              else:
+                  _aug_archive2_file = glob(rf'{_augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
+                          else glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[1]]}_*')
+              return _aug_archive1_file, _aug_archive2_file
 
-                # Sample noise as discriminator Z,Y ground truth
 
-                if self.usecuda:
-                    z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
-                    z_prior.cuda()
-                    ohc = RelaxedOneHotCategorical(
-                        torch.tensor([T], device="cuda"),
-                        torch.ones([nrows, self.y_len], device="cuda"),
-                    )
-                    y_prior = ohc.sample()
-                    y_prior = y_prior.cuda()
+          for epoch_i in range(nepochs):
 
-                else:
-                    z_prior = Variable(
-                        Tensor(np.random.normal(0, 1, (nrows, self.ld)))
-                    )
-                    ohc = RelaxedOneHotCategorical(
-                        T, torch.ones([nrows, self.y_len])
-                    )
-                    y_prior = ohc.sample()
+              aug_archive1_file = glob(rf'{augmentationpath+os.sep}pool0*k{self.k}_*index{epoch_i // augmentation_count_number[0]}_*') if hparams.augmode[0] == -1 \
+                            else glob(rf'{augmentationpath+os.sep}pool0*k{self.k}_*index{epoch_i // augmentation_count_number[0]}_{aug_all_method[hparams.augmode[0]]}_*')
+              aug_archive2_file = glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{epoch_i % augmentation_count_number[1]}_*') if hparams.augmode[1] == -1 \
+                      else glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{epoch_i % augmentation_count_number[1]}_{aug_all_method[hparams.augmode[1]]}_*')
 
-                del ohc
+              '''If augdatashuffle in on, read augmentation data from shuffled-indexed files'''
+              if hparams.augdatashuffle:
+                  shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath, hparams.augdatashuffle)
+                  aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
 
-                if self.usecuda:
-                    depths_in = depths_in.cuda()
-                    tnfs_in = tnfs_in.cuda()
+              '''Avoid training 2 same augmentation data'''
+              aug_tensor1, aug_tensor2 = 0, 0
+              while(torch.sum(torch.sub(aug_tensor1, aug_tensor2))==0):
+                  aug_arr1, aug_arr2 = read_npz(aug_archive1_file[0]), read_npz(aug_archive2_file[0])
+                  '''Mutate rpkm and tnf array in-place instead of making a copy.'''
+                  aug_arr1 = numpy_inplace_maskarray(aug_arr1, mask)
+                  aug_arr2 = numpy_inplace_maskarray(aug_arr2, mask)
+                  '''Zscore for augmentation data (same as the depth and tnf)'''
+                  zscore(aug_arr1, axis=0, inplace=True)
+                  zscore(aug_arr2, axis=0, inplace=True)
+                  aug_tensor1, aug_tensor2 = torch.from_numpy(aug_arr1), torch.from_numpy(aug_arr2)
+                  # print('augtensor', _torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
+                  # if aug_tensor1 == aug_tensor2, reloop
+                  shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath)
+                  aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
+                
+              if epoch_i in batchsteps:
+                  data_loader = _DataLoader(
+                      dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
+                      batch_size=data_loader.batch_size * 2,
+                      shuffle=True,
+                      drop_last=False, #or True?
+                      num_workers=data_loader.num_workers,
+                      pin_memory=data_loader.pin_memory,
+                  )
+              else:
+                  data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
+                      batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
+                      shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
+              self.trainepoch(data_loader, epoch, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, awl)
+        
+        #Non contrastive learning
+        else:
+            optimizer = Adam(self.parameters(), lr=lrate)
+            data_loader = _DataLoader(dataset=dataloader.dataset,
+                                    batch_size=dataloader.batch_size,
+                                    shuffle=True,
+                                    drop_last=False,
+                                    num_workers=dataloader.num_workers,
+                                    pin_memory=dataloader.pin_memory)
+            for epoch in range(nepochs):
+                if epoch in batchsteps:
+                    data_loader = _DataLoader(dataset=data_loader.dataset,
+                                        batch_size=data_loader.batch_size * 2,
+                                        shuffle=True,
+                                        drop_last=False,
+                                        num_workers=data_loader.num_workers,
+                                        pin_memory=data_loader.pin_memory)
+                self.trainepoch(data_loader, epoch, batchsteps_set, logfile, Namespace())
+            
 
-                # -----------------
-                #  Train Generator
-                # -----------------
-                optimizer_E.zero_grad()
-                optimizer_D.zero_grad()
-
-                # Forward pass
-                (
-                    _,
-                    depths_out,
-                    tnfs_out,
-                    z_latent,
-                    y_latent,
-                    d_z_latent,
-                    d_y_latent,
-                ) = self(depths_in, tnfs_in, z_prior, y_prior)
-
-                vae_loss, ce, sse = self.calc_loss(
-                    depths_in, depths_out, tnfs_in, tnfs_out
-                )
-                g_loss_adv_z = adversarial_loss(
-                    self._discriminator_z(z_latent), labels_prior
-                )
-                g_loss_adv_y = adversarial_loss(
-                    self._discriminator_y(y_latent), labels_prior
-                )
-
-                ed_loss = (
-                    (1 - self.sl) * vae_loss
-                    + (self.sl * self.slr) * g_loss_adv_z
-                    + (self.sl * (1 - self.slr)) * g_loss_adv_y
-                )
-
-                ed_loss.backward()
-                optimizer_E.step()
-                optimizer_D.step()
-
-                # ----------------------
-                #  Train Discriminator z
-                # ----------------------
-
-                optimizer_D_z.zero_grad()
-                mu, logvar = self._encode(depths_in, tnfs_in)[:2]
-                z_latent = self._reparameterization(mu, logvar)
-
-                d_z_loss_prior = adversarial_loss(
-                    self._discriminator_z(z_prior), labels_prior
-                )
-                d_z_loss_latent = adversarial_loss(
-                    self._discriminator_z(z_latent), labels_latent
-                )
-                d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
-
-                d_z_loss.backward()
-                optimizer_D_z.step()
-
-                # ----------------------
-                #  Train Discriminator y
-                # ----------------------
-
-                optimizer_D_y.zero_grad()
-                y_latent = self._encode(depths_in, tnfs_in)[2]
-                d_y_loss_prior = adversarial_loss(
-                    self._discriminator_y(y_prior), labels_prior
-                )
-                d_y_loss_latent = adversarial_loss(
-                    self._discriminator_y(y_latent), labels_latent
-                )
-                d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
-
-                d_y_loss.backward()
-                optimizer_D_y.step()
-
-                ED_loss_e += float(ed_loss.item())
-                V_loss_e += float(vae_loss.item())
-                D_z_loss_e += float(d_z_loss.item())
-                D_y_loss_e += float(d_y_loss.item())
-                CE_e += float(ce.item())
-                SSE_e += float(sse.item())
-
-            time_epoch_1 = time.time()
-            time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
-
-            if logfile is not None:
-                print(
-                    "\tEpoch: {}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
-                        epoch_i + 1,
-                        ED_loss_e / total_batches_inthis_epoch,
-                        V_loss_e / total_batches_inthis_epoch,
-                        CE_e / total_batches_inthis_epoch,
-                        SSE_e / total_batches_inthis_epoch,
-                        D_z_loss_e / total_batches_inthis_epoch,
-                        D_y_loss_e / total_batches_inthis_epoch,
-                        data_loader.batch_size,
-                        time_e,
-                    ),
-                    file=logfile,
-                )
-                logfile.flush()
-
-            # save model
-            if modelfile is not None:
-                try:
-                    checkpoint = {
-                        "state": self.state_dict(),
-                        "optimizer_ED": optimizer_ED.state_dict(),
-                        "optimizer_D_z": optimizer_D_z.state_dict(),
-                        "optimizer_D_y": optimizer_D_y.state_dict(),
-                        "nsamples": self.num_samples,
-                        "alpha": self.alpha,
-                        "nhiddens": self.h_n,
-                        "nlatent_l": self.ld,
-                        "nlatent_y": self.y_len,
-                        "sl": self.sl,
-                        "slr": self.slr,
-                        "temp": self.T,
-                    }
-                    torch.save(checkpoint, modelfile)
-
-                except:
-                    pass
-
-        return None
-
-    ########### funciton that retrieves the clusters from Y latents
+    ########### function that retrieves the clusters from Y latents
     def get_latents(self, contignames, data_loader, last_epoch=True):
         """Retrieve the categorical latent representation (y) and the contiouous latents (l) of the inputs
 
@@ -440,7 +741,7 @@ class AAE(nn.Module):
 
         Output:
             y_clusters_dict ({clust_id : [contigs]})
-            l_latents array"""
+            l_latents array""" #to be clustered with k-medoids
         self.eval()
 
         new_data_loader = _DataLoader(
@@ -490,11 +791,11 @@ class AAE(nn.Module):
                     tnfs_in = tnfs_in.cuda()
 
                 if last_epoch:
-                    mu, _, _, _, y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[
+                    mu, _, _, _, _, y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[
                         0:5
                     ]
                 else:
-                    y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[4]
+                    y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[5]
 
                 if self.usecuda:
                     Ys = y_sample.cpu().detach().numpy()
