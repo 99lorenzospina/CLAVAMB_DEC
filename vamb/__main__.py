@@ -44,6 +44,11 @@ def calc_tnf(
     npzpath: Optional[str],
     mincontiglength: int,
     logfile: IO[str],
+    nepocs: int,
+    augmentation_store_dir: str,
+    augmode = [-1,-1],
+    contrastive=True,
+    k=4,
 ) -> vamb.parsecontigs.Composition:
     begintime = time.time()/60
     log("\nLoading TNF", logfile, 0)
@@ -56,12 +61,29 @@ def calc_tnf(
     else:
         assert fastapath is not None
         log(f"Loading data from FASTA file {fastapath}", logfile, 1)
-        with vamb.vambtools.Reader(fastapath) as file:
-            composition = vamb.parsecontigs.Composition.from_file(
-                file, minlength=mincontiglength
-            )
-        composition.save(os.path.join(outdir, "composition.npz"))
+        if not contrastive:
+            with vamb.vambtools.Reader(fastapath) as file:
+                composition = vamb.parsecontigs.Composition.from_file(
+                    file, minlength=mincontiglength
+                )
+            composition.save(os.path.join(outdir, "composition.npz"))
+        else:
+            os.system(f'mkdir -p {augmentation_store_dir}')
+            backup_iteration = math.ceil(math.sqrt(nepochs))
+            log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
+            with vamb.vambtools.Reader(fastapath) as file:
+              composition = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=mincontiglength, k=k, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode)
+              tnffile.close()
+              composition.save(os.path.join(outdir, "composition.npz"))
 
+    ''' composition.save should do the trick
+    vamb.vambtools.write_npz(os.path.join(outdir, 'tnf.npz'), tnfs)
+    vamb.vambtools.write_npz(os.path.join(outdir, 'lengths.npz'), contiglengths)
+    with open(os.path.join(outdir, 'contignames.txt'),'w') as f:
+            f.write('\n'.join(contignames))
+            f.close()
+    '''
+    
     elapsed = round(time.time()/60 - begintime, 2)
     print("", file=logfile)
     log(
@@ -78,6 +100,7 @@ def calc_rpkm(
     outdir: str,
     bampaths: Optional[list[str]],
     npzpath: Optional[str],
+    jgipath: Optional[str],
     comp_metadata: vamb.parsecontigs.CompositionMetaData,
     verify_refhash: bool,
     minid: float,
@@ -108,7 +131,11 @@ def calc_rpkm(
                 f"Loaded abundance has {abundance.nseqs} sequences, "
                 f"but composition has {comp_metadata.nseqs}."
             )
-
+    elif jgipath is not None:
+        log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
+        with open(jgipath) as file:
+            rpkms = vamb.parsebam.load_jgi(file, mincontiglength, comp_metadata.refhash if verify_refhash else None)
+            abundance = vamb.parsebam.Abundance(rpkms, comp_metadata, minid, comp_metadata.refhash if verify_refhash else None)
     else:
         assert bampaths is not None
         log(f"Parsing {len(bampaths)} BAM files with {nthreads} threads", logfile, 1)
@@ -133,6 +160,12 @@ def trainvae(
     outdir: str,
     rpkms: np.ndarray,
     tnfs: np.ndarray,
+    k: int,
+    contrastive: bool,
+    augmode: list[int],
+    augdatashuffle: bool,
+    augmentationpath: str,
+    temperature: float,
     lengths: np.ndarray,
     nhiddens: Optional[list[int]],  # set automatically if None
     nlatent: int,
@@ -153,17 +186,19 @@ def trainvae(
     assert len(rpkms) == len(tnfs)
 
     nsamples = rpkms.shape[1]
-    vae = vamb.encode.VAE(
-        nsamples,
-        nhiddens=nhiddens,
-        nlatent=nlatent,
-        alpha=alpha,
-        beta=beta,
-        dropout=dropout,
-        cuda=cuda,
+
+    # basic config for contrastive learning
+    aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
+    hparams = Namespace(
+        validation_size=4096,   # Debug only. Validation size for training.
+        visualize_size=25600,   # Debug only. Visualization (pca) size for training.
+        temperature=temperature,        # The parameter for contrastive loss
+        augmode=augmode,        # Augmentation method choices (in aug_all_method)
+        sigma = 4000,           # Add weight on the contrastive loss to avoid gradient disappearance
+        lrate_decent = 0.8,     # Decrease the learning rate by lrate_decent for each batchstep
+        augdatashuffle = augdatashuffle     # Shuffle the augmented data for training to introduce more noise. Setting True is not recommended. [False]
     )
 
-    log("Created VAE", logfile, 1)
     dataloader, mask = vamb.encode.make_dataloader(
         rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
     )
@@ -174,15 +209,22 @@ def trainvae(
     log(f"Number of sequences remaining: {len(mask) - n_discarded}", logfile, 1)
     print("", file=logfile)
 
-    modelpath = os.path.join(outdir, "model.pt")
-    vae.trainmodel(
-        dataloader,
-        nepochs=nepochs,
-        lrate=lrate,
-        batchsteps=batchsteps,
-        logfile=logfile,
-        modelfile=modelpath,
-    )
+    if contrastive:
+        if True:
+            vae = VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent,alpha=alpha, beta=beta, dropout=dropout, cuda=cuda, c=True)
+            log("Created VAE", logfile, 1)
+            modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
+            vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
+        else:
+            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_vae.pt")
+            vae = VAE.load(modelpath,cuda=cuda,c=True)
+            log("Loaded VAE", logfile, 1)
+            vae.to(('cuda' if cuda else 'cpu'))
+    else:
+        vae = VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent, alpha=alpha, beta=beta, dropout=dropout, cuda=cuda)
+        log("Created VAE", logfile, 1)
+        modelpath = os.path.join(outdir, 'vae_model.pt')
+        vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
 
     print("", file=logfile)
     log("Encoding to latent representation", logfile, 1)
@@ -199,6 +241,12 @@ def trainaae(
     outdir: str,
     rpkms: np.ndarray,
     tnfs: np.ndarray,
+    k: int,
+    contrastive: bool,
+    augmode: list[int],
+    augdatashuffle: bool,
+    augmentationpath: str,
+    temperature: float,
     lengths: np.ndarray,
     nhiddens: Optional[list[int]],  # set automatically if None
     nlatent_z: int,
@@ -220,12 +268,20 @@ def trainaae(
     log("\nCreating and training AAE", logfile)
     nsamples = rpkms.shape[1]
 
+    # basic config for contrastive learning
+    aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
+    hparams = Namespace(
+        validation_size=4096,   # Debug only. Validation size for training.
+        visualize_size=25600,   # Debug only. Visualization (pca) size for training.
+        temperature=temperature,        # The parameter for contrastive loss
+        augmode=augmode,        # Augmentation method choices (in aug_all_method)
+        sigma = 4000,           # Add weight on the contrastive loss to avoid gradient disappearance
+        lrate_decent = 0.8,     # Decrease the learning rate by lrate_decent for each batchstep
+        augdatashuffle = augdatashuffle     # Shuffle the augmented data for training to introduce more noise. Setting True is not recommended. [False]
+    )
+    
     assert len(rpkms) == len(tnfs)
 
-
-    aae = aamb_encode.AAE(nsamples, nhiddens, nlatent_z, nlatent_y, sl, slr , alpha ,cuda)
-
-    log("Created AAE", logfile,1)
     dataloader, mask = vamb.encode.make_dataloader(
         rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
     )
@@ -236,22 +292,28 @@ def trainaae(
     log(f"Number of sequences remaining: {len(mask) - n_discarded}", logfile, 1)
     print("", file=logfile)
 
-    modelpath = os.path.join(outdir, "aae_model.pt")
-    aae.trainmodel(dataloader, 
-                   nepochs, 
-                   batchsteps, 
-                   temp, 
-                   lrate,
-                   logfile, 
-                   modelpath)
-
-
-
+    if contrastive:
+        if True:
+            aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=True)
+            log("Created AAE", logfile, 1)
+            modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
+            aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
+        else:
+            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_aae.pt")
+            log("Loaded AAE", logfile, 1)
+            aae = AAE.load(modelpath,cuda=cuda,c=True)
+            aae.to(('cuda' if cuda else 'cpu'))
+    else:
+        aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=True)
+        log("Created AAE", logfile, 1)
+        modelpath = os.path.join(outdir, 'aae_model.pt')
+        aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
+    
     print("", file=logfile)
     log("Encoding to latent representation", logfile, 1)
     clusters_y_dict,latent = aae.get_latents(contignames, dataloader)
     vamb.vambtools.write_npz(os.path.join(outdir, "aae_z_latent.npz"), latent)
-    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), latenty_)
+    vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict)
 
     del aae  # Needed to free "latent" array's memory references?
 
