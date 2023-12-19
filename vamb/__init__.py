@@ -19,7 +19,7 @@ General workflow:
 7) Split bins using vamb.vambtools
 """
 
-__authors__ = "Jakob Nybo Nissen", "Simon Rasmussen"
+__authors__ = "Jakob Nybo Nissen", "Simon Rasmussen", "Lorenzo Spina"
 __licence__ = "MIT"
 __version__ = (4, 0, 0, "DEV")
 
