@@ -711,7 +711,6 @@ class AAE(nn.Module):
         
         #Non contrastive learning
         else:
-            optimizer = Adam(self.parameters(), lr=lrate)
             data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
                                     shuffle=True,
