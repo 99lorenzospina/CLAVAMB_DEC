@@ -23,14 +23,14 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(random_seed)
 
 ############################################################################# MODEL ###########################################################
-class AAE(nn.Module):
+class AAEDEC(nn.Module):
     def __init__(
         self,
         ntnf: int, #103
         nsamples: int,
         nhiddens: int, #but it should be a list!
         nlatent_l: int,
-        nlatent_y, #careful: nlatent_y should be the number of extimated clusters
+        nlatent_y, #careful: nlatent_y should be the number of estimated clusters
         sl: float,
         slr: float,
         alpha: Optional[float],
@@ -57,6 +57,8 @@ class AAE(nn.Module):
         self.alpha = alpha
         self.usecuda = _cuda
         self.contrast = contrast
+        self.lr = lr
+        self.cri_lr = lr
 
         # encoder
         self.encoder = nn.Sequential(
@@ -118,7 +120,9 @@ class AAE(nn.Module):
     def _critic(self, c):
         return self.critic(c)
     
-    def pretrain(self, dataloader, c, max_iter, lr, cri_lr):
+    def pretrain(self, dataloader, max_iter, lr, cri_lr):
+        lr = self.lr
+        cri_lr = self.lr
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         depthstensor, tnftensor = dataloader.dataset.tensors
         ncontigs, nsamples = depthstensor.shape
