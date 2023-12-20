@@ -140,18 +140,18 @@ class Composition:
         _vambtools.numpy_inplace_maskarray(self.matrix, mask)
 
     @staticmethod
-    def _project(fourmers: _np.ndarray, kernel: _np.ndarray = _KERNEL) -> _np.ndarray:
+    def _project(fourmers: np.ndarray, kernel: np.ndarray = _KERNEL) -> np.ndarray:
         "Project fourmers down in dimensionality"
-        s = fourmers.sum(axis=1).reshape(-1, 1)
+        s = fourmers.sum(axis=1).reshape(-1, 1) #sum the content of each row, encolumn the results, the number of rows is the same as before
         s[s == 0] = 1.0
         fourmers *= 1 / s
         fourmers += -(1 / 256)
-        return _np.dot(fourmers, kernel)
+        return np.dot(fourmers, kernel)
 
     @staticmethod
-    def _convert(raw: _vambtools.PushArray, projected: _vambtools.PushArray):
+    def _convert(raw: PushArray, projected: PushArray): #change this in order to move from TNF to new representation
         "Move data from raw PushArray to projected PushArray, converting it."
-        raw_mat = raw.take().reshape(-1, 256)
+        raw_mat = raw.take().reshape(-1, 256) #I impose only 256 colmumns, so every row is a single kmer-vector
         projected_mat = Composition._project(raw_mat)
         projected.extend(projected_mat.ravel())
         raw.clear()
@@ -161,8 +161,8 @@ class Composition:
       s = raw_mat.sum(axis=1).reshape(-1, 1)
       s[s == 0] = 1.0
       raw_mat *= 1/s
-      raw_mat += -(1/(4**k))
-      return _np.dot(raw_mat, kernel)
+      raw_mat += -(1/(4**k))  #raw_mat is still with 256 columns
+      return np.dot(raw_mat, kernel)  #dimensions: "-1"x103, every row is a kmer encoded
 
     @classmethod
     def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100) -> C:
@@ -176,16 +176,16 @@ class Composition:
         if minlength < 4:
             raise ValueError(f"Minlength must be at least 4, not {minlength}")
 
-        raw = _vambtools.PushArray(_np.float32)
-        pc = _vambtools.PushArray(_np.float32)
-        projected = _vambtools.PushArray(_np.float32)
-        lengths = _vambtools.PushArray(_np.int32)
+        raw = PushArray(np.float32)
+        pc = PushArray(np.float32)
+        projected = PushArray(np.float32)
+        lengths = PushArray(np.int32)
         mask = bytearray()  # we convert to Numpy at end
         contignames: list[str] = list()
 
-        entries = _vambtools.byte_iterfasta(filehandle)
+        entries = byte_iterfasta(filehandle)
 
-        for entry in entries:
+        for entry in entries: #entry is a single contig taken by the FASTA file
             skip = len(entry) < minlength
             mask.append(not skip)
 
@@ -206,18 +206,21 @@ class Composition:
         Composition._convert(raw, projected)
         tnfs_arr = projected.take()
 
+        pcs_arr = pc.take()
+
         # Don't use reshape since it creates a new array object with shared memory
-        tnfs_arr.shape = (len(tnfs_arr) // 103, 103)    #here I impose the shape of the entry layer of my autoencoder!
-        pcs_arr.shape(len(pcs_arr) // 103, 103)
+        tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
         lengths_arr = lengths.take()
 
+        '''tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer'''
+
         metadata = CompositionMetaData(
-            _np.array(contignames, dtype=object),
+            np.array(contignames, dtype=object),
             lengths_arr,
-            _np.array(mask, dtype=bool),
+            np.array(mask, dtype=bool),
             minlength,
         )
-        return cls(metadata, tnfs_arr)
+        return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
 
 @classmethod
     def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
