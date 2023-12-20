@@ -237,6 +237,66 @@ def trainvae(
 
     return mask, latent
 
+def pretrainaae(
+    outdir: str,
+    rpkms: np.ndarray,
+    tnfs: np.ndarray,
+    k: int,
+    contrastive: bool,
+    augmode: list[int],
+    augdatashuffle: bool,
+    augmentationpath: str,
+    temperature: float,
+    lengths: np.ndarray,
+    nhiddens: Optional[list[int]],  # set automatically if None
+    nlatent_z: int,
+    nlatent_y: int,
+    alpha: Optional[float],  # set automatically if None
+    sl: float,
+    slr: float,
+    lr: float,
+    cri_lr: float,
+    temp: Optional[float] ,
+    cuda: bool,
+    batchsize: int,
+    nepochs: int,
+    lrate: float,
+    batchsteps: list[int],
+    logfile: IO[str],
+    contignames: np.ndarray):
+
+    begintime = time.time()/60
+    log("\nCreating and training AAE", logfile)
+    nsamples = rpkms.shape[1]
+
+    assert len(rpkms) == len(tnfs)
+
+    dataloader, mask = vamb.encode.make_dataloader(
+        rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
+    )
+    log("Created dataloader and mask", logfile, 1)
+    #vamb.vambtools.write_npz(os.path.join(outdir, "mask.npz"), mask)
+    n_discarded = len(mask) - mask.sum()
+    log(f"Number of sequences unsuitable for encoding: {n_discarded}", logfile, 1)
+    log(f"Number of sequences remaining: {len(mask) - n_discarded}", logfile, 1)
+    print("", file=logfile)
+
+    aae = AAEDEC(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=False)
+    log("Created AAE", logfile, 1)
+    modelpath = os.path.join(outdir, 'aae_model.pt')
+    aae.pretrain(dataloader, nlatent_y, nepocs, lr, cri_lr)
+    print("", file=logfile)
+    log("Encoding to latent representation", logfile, 1)
+    clusters_y_dict,latent = aae.get_latents(contignames, dataloader)
+    vamb.vambtools.write_npz(os.path.join(outdir, "aae_z_latent_pretreined.npz"), latent)
+
+    del aae  # Needed to free "latent" array's memory references?
+
+    elapsed = round(time.time()/60 - begintime, 2)
+    log(f"Pretrained AAEDEC and encoded in {elapsed} minutes", logfile, 1)
+
+    return mask, latent, clusters_y_dict
+
 def trainaae(
     outdir: str,
     rpkms: np.ndarray,
@@ -469,6 +529,8 @@ def run(
     dropout: Optional[float],
     sl: float,
     slr: float,
+    pre_lrate: float,
+    cri_lrate: float,
     temp: float,
     lrate: float,
     batchsteps: list[int],
@@ -559,7 +621,7 @@ def run(
     if 'aae' in model_selection:
         begin_train_aae = time.time()/60
         # Train, save model
-        mask, latent_z, clusters_y_dict = trainaae(
+        mask, latent_z, clusters_y_dict = pretrainaae(
             outdir,
             abundance.matrix,
             composition.matrix,
@@ -576,6 +638,8 @@ def run(
             alpha,
             sl,
             slr,
+            pre_lrate,
+            cri_lrate,
             temp,
             cuda,
             batchsize_aae,
@@ -923,6 +987,10 @@ def main():
                         default=0.00964, help='loss scale between reconstruction loss and adversarial losses [0.00964] ')
     aaeos.add_argument('--slr_aae', dest='slr', metavar='', type=float,
                         default=0.5, help='loss scale between reconstruction adversarial losses [0.5] ')
+    aaeos.add_argument('--pre_lrate', dest='pre_lrate', metavar='', type=float,
+                        default=0.00964, help='learning rate for pretraining in DEC [0.00964] ')
+    aaeos.add_argument('--cri_lrate', dest='cri_lrate', metavar='', type=float,
+                        default=0.5, help='learning rate for critical in DEC [0.5] ')
     aaeos.add_argument('--aae_temp', dest='temp', metavar='', type=float,
                         default=0.1596, help=' Temperature of the softcategorical prior [0.1596]')
 
@@ -1267,6 +1335,8 @@ def main():
             dropout=dropout,
             sl=args.sl,
             slr=args.slr,
+            pre_lrate = args.pre_lrate,
+            cri_lrate = args.cri_lrate,
             temp=args.temp,
             lrate=lrate,
             batchsteps=batchsteps,
