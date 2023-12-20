@@ -318,7 +318,7 @@ class AAE(nn.Module):
                 )
 
                 ed_loss.backward()
-                optimizer_E.step
+                optimizer_E.step()
                 optimizer_D.step()
 
                 # ----------------------
