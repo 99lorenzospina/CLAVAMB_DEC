@@ -103,8 +103,23 @@ class AAE(nn.Module):
             nn.Sigmoid(),
         )
 
+        # critic: like discriminator Z
+        self.critic = nn.Sequential(
+            nn.Linear(self.ld, self.h_n),
+            nn.LeakyReLU(),
+            nn.Linear(self.h_n, int(self.h_n / 2)),
+            nn.LeakyReLU(),
+            nn.Linear(int(self.h_n / 2), 1),
+            nn.Sigmoid(),     
+        )
+
         if _cuda:
             self.cuda()
+    
+    def pretrain(self, dataloader, c, max_iter, lr):
+        
+        
+        return
 
     ## Reparametrisation trick
     def _reparameterization(self, mu, logvar):
