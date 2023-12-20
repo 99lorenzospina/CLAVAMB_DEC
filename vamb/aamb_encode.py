@@ -240,7 +240,7 @@ class AAE(nn.Module):
     #  Training
     # ----------
 
-    def trainepoch(self, data_loader, epoch, batchsteps, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, awl=None):
+    def trainepoch(self, data_loader, epoch, batchsteps, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, awl=None):
         self.train()
         (
             ED_loss_e,
@@ -707,7 +707,7 @@ class AAE(nn.Module):
                   data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
                       shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
-              self.trainepoch(data_loader, epoch, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, awl)
+              self.trainepoch(data_loader, epoch, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, awl)
         
         #Non contrastive learning
         else:
@@ -726,7 +726,7 @@ class AAE(nn.Module):
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(data_loader, epoch, batchsteps_set, logfile, Namespace())
+                self.trainepoch(data_loader, epoch, batchsteps_set, logfile, Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor)
             
 
     ########### function that retrieves the clusters from Y latents
