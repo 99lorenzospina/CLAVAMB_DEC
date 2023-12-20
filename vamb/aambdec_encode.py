@@ -154,6 +154,7 @@ class AAE(nn.Module):
 
         
         for iter in range(max_iter):
+            self.train()
             (
                 crit_loss,
                 ed_loss,
