@@ -623,16 +623,16 @@ class AAE(nn.Module):
             adversarial_loss.cuda()
 
         #### Optimizers
-        optimizer_E = torch.optim.Adam(enc_params, lr=lr)
-        optimizer_D = torch.optim.Adam(dec_params, lr=lr)
+        optimizer_E = torch.optim.Adam(enc_params, lr=lrate)
+        optimizer_D = torch.optim.Adam(dec_params, lr=lrate)
 
-        optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lr)
-        optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lr)
+        optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lrate)
+        optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
 
         #Contrastive Learning
         if contrastive:
           awl = AutomaticWeightedLoss(3)
-          optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lr)
+          optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lrate)
 
 
           '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
