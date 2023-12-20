@@ -103,22 +103,111 @@ class AAE(nn.Module):
             nn.Sigmoid(),
         )
 
-        # critic: like discriminator Z
+        # critic
         self.critic = nn.Sequential(
-            nn.Linear(self.ld, self.h_n),
+            nn.Linear(self.input_length, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
-            nn.Linear(int(self.h_n / 2), 1),
-            nn.Sigmoid(),     
+            nn.AvgPool1d(kernel_size = int(self.h_n / 2)),
         )
 
         if _cuda:
             self.cuda()
+
+    def _critic(self, c):
+        return self.critic(c)
     
-    def pretrain(self, dataloader, c, max_iter, lr):
+    def pretrain(self, dataloader, c, max_iter, lr, cri_lr):
+        Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
+        depthstensor, tnftensor = dataloader.dataset.tensors
+        ncontigs, nsamples = depthstensor.shape
+
+        # Initialize generator and critic
+
+        if logfile is not None:
+            print("\tNetwork properties:", file=logfile)
+            print("\tCUDA:", self.usecuda, file=logfile)
+            print("\tAlpha:", self.alpha, file=logfile)
+            print("\tY length:", self.y_len, file=logfile)
+            print("\tZ length:", self.ld, file=logfile)
+            print("\n\tTraining properties:", file=logfile)
+            print("\tN epochs:", nepochs, file=logfile)
+            print("\tStarting batch size:", data_loader.batch_size, file=logfile)
+            print("\tN sequences:", ncontigs, file=logfile)
+            print("\tN samples:", self.nsamples, file=logfile, end="\n\n")
+
+        enc_params = []
+        dec_params = []
+        cri_params = []
+        for name, param in self.named_parameters():
+            if "critic" in name:
+                cri_params.append(param)
+            elif "encoder" in name:
+                enc_params.append(param)
+            elif "decoder" in name:
+                dec_params.append(param)
+
+        optimizer_E = torch.optim.Adam(enc_params, lr=lr)
+        optimizer_D = torch.optim.Adam(dec_params, lr=lr)
+        optimizer_C = torch.optim.Adam(cri_params, lr=cri_lr)
+
         
-        
+        for iter in range(max_iter):
+            (
+                crit_loss,
+                ed_loss,
+            ) = (0,0)
+
+            data_loader = _DataLoader(dataset=dataloader.dataset,
+                                    batch_size=dataloader.batch_size,
+                                    shuffle=True,
+                                    drop_last=False,
+                                    num_workers=dataloader.num_workers,
+                                    pin_memory=dataloader.pin_memory)
+            
+            for depths_in, tnf_in in data_loader:
+                n.requires_grad = True
+                tnf_in.requires_grad = True
+                a = random.random()
+                b = random.random()
+                s = random.random()
+                zx = torch.zeros(self.ld)
+                yx = torch.zeros(self.y_len)
+                while(b==a):
+                    b = random.random()
+                while(s==a or s == b):
+                    s = random.random()
+    
+                random_samples = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
+                for d_sample, t_sample in random_samples:
+                    mu, logvar, y_latent = self._encode(d_sample, t_sample)
+                    z_latent = self._reparameterization(mu, logvar)
+                    zx += a*z_latent
+                    yx += a*y_latent
+                    a = 1 - a
+                
+                r_depths_out, r_tnfs_out = self._decode(zx, yx)
+                x = torch.cat(r_depths_out, r_tnfs_out)
+                mu, logvar, y_latent = self._encode(depths_in, tnfs_in)
+                z_latent = self._reparameterization(mu, logvar)
+                depths_out, tnfs_out = self._decode(z_latent, y_latent)
+                reg_term = _critic(b*torch.cat(depths_in, tnf_in) + (1-b)*torch.cat(depths_out, tnfs_out)).pow(2).sum(dim=1).mean()
+                crit_loss = torch.abs(_critic(x) - torch.tensor(a, torch.float))**2 + reg_term
+                ed_loss = (torch.dist(torch.cat(depths_in, tnf_in), torch.cat(depths_out, tnfs_out), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(_critic(x))**2
+
+                ed_loss.backward()                
+                optimizer_E.step()
+                optimizer_D.step()
+                crit_loss.backward()
+                optimizer_C.step()
+
+                ed_loss += ed_loss.item()
+                crit_loss += crit_loss.item()
+                
+                time_epoch_1 = time.time()
+                time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+                
         return
 
     ## Reparametrisation trick
@@ -629,7 +718,7 @@ class AAE(nn.Module):
                 disc_y_params.append(param)
             elif "encoder" in name:
                 enc_params.append(param)
-            else:
+            elif "decoder" in name:
                 dec_params.append(param)
 
         # Define adversarial loss for the discriminators
