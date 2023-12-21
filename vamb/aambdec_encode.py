@@ -1,4 +1,4 @@
-"""Adversarial autoencoders (AAE) for metagenomics binning, this files contains the implementation of the AAE"""
+"""Adversarial autoencoders (AAE) for metagenomics binning, this files contains the implementation of the AAE_DEC"""
 
 
 import numpy as np
@@ -29,7 +29,6 @@ class AAEDEC(nn.Module):
         ntnf: int, #103
         nsamples: int,
         nhiddens: int, #but it should be a list!
-        nlatent_l: int,
         nlatent_y, #careful: nlatent_y should be the number of estimated clusters
         sl: float,
         slr: float,
@@ -49,7 +48,6 @@ class AAEDEC(nn.Module):
         self.nsamples = nsamples
         self.ntnf = ntnf
         self.h_n = nhiddens
-        self.ld = nlatent_l
         self.y_len = nlatent_y
         self.input_len = int(self.ntnf + self.nsamples)
         self.sl = sl
@@ -70,13 +68,11 @@ class AAEDEC(nn.Module):
             nn.LeakyReLU(),
         )
         # latent layers
-        self.mu = nn.Linear(self.h_n, self.ld)
-        self.logvar = nn.Linear(self.h_n, self.ld)
-        self.y_vector = nn.Linear(self.h_n, self.y_len)
+        self.mu = nn.Linear(self.h_n, self.y_len)
 
         # decoder
         self.decoder = nn.Sequential(
-            nn.Linear(int(self.ld + self.y_len), self.h_n),
+            nn.Linear(self.y_len, self.h_n),
             nn.BatchNorm1d(self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, self.h_n),
@@ -85,8 +81,8 @@ class AAEDEC(nn.Module):
             nn.Linear(self.h_n, self.input_len),
         )
 
-        # discriminator z
-        self.discriminator_z = nn.Sequential(
+        # discriminator
+        self.discriminator = nn.Sequential(
             nn.Linear(self.input_length, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
@@ -95,15 +91,6 @@ class AAEDEC(nn.Module):
             nn.Sigmoid(),
         )
 
-        # discriminator Y
-        self.discriminator_y = nn.Sequential(
-            nn.Linear(self.input_length, self.h_n),
-            nn.LeakyReLU(),
-            nn.Linear(self.h_n, int(self.h_n / 2)),
-            nn.LeakyReLU(),
-            nn.Linear(int(self.h_n / 2), 1),
-            nn.Sigmoid(),
-        )
 
         # critic
         self.critic = nn.Sequential(
@@ -112,6 +99,7 @@ class AAEDEC(nn.Module):
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
             nn.AvgPool1d(kernel_size = int(self.h_n / 2)),
+            nn.Identity(),
         )
 
         if _cuda:
@@ -133,8 +121,7 @@ class AAEDEC(nn.Module):
             print("\tNetwork properties:", file=logfile)
             print("\tCUDA:", self.usecuda, file=logfile)
             print("\tAlpha:", self.alpha, file=logfile)
-            print("\tY length:", self.y_len, file=logfile)
-            print("\tZ length:", self.ld, file=logfile)
+            print("\tN of clusters:", self.y_len, file=logfile)
             print("\n\tTraining properties:", file=logfile)
             print("\tN epochs:", nepochs, file=logfile)
             print("\tStarting batch size:", data_loader.batch_size, file=logfile)
@@ -158,6 +145,7 @@ class AAEDEC(nn.Module):
 
         
         for iter in range(max_iter):
+            time_epoch_0 = time.time()
             self.train()
             (
                 crit_loss,
@@ -177,8 +165,7 @@ class AAEDEC(nn.Module):
                 a = random.random()
                 b = random.random()
                 s = random.random()
-                zx = torch.zeros(self.ld)
-                yx = torch.zeros(self.y_len)
+                z = torch.zeros(self.y_len)
                 while(b==a):
                     b = random.random()
                 while(s==a or s == b):
@@ -186,17 +173,14 @@ class AAEDEC(nn.Module):
     
                 random_samples = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
                 for d_sample, t_sample in random_samples:
-                    mu, logvar, y_latent = self._encode(d_sample, t_sample)
-                    z_latent = self._reparameterization(mu, logvar)
-                    zx += a*z_latent
-                    yx += a*y_latent
+                    mu = self._encode(d_sample, t_sample)
+                    z += mu*a
                     a = 1 - a
                 
-                r_depths_out, r_tnfs_out = self._decode(zx, yx)
+                r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat(r_depths_out, r_tnfs_out)
-                mu, logvar, y_latent = self._encode(depths_in, tnfs_in)
-                z_latent = self._reparameterization(mu, logvar)
-                depths_out, tnfs_out = self._decode(z_latent, y_latent)
+                mu = self._encode(depths_in, tnfs_in)
+                depths_out, tnfs_out = self._decode(mu)
                 reg_term = _critic(b*torch.cat(depths_in, tnf_in) + (1-b)*torch.cat(depths_out, tnfs_out)).pow(2).sum(dim=1).mean()
                 crit_loss = torch.abs(_critic(x) - torch.tensor(a, torch.float))**2 + reg_term
                 ed_loss = (torch.dist(torch.cat(depths_in, tnf_in), torch.cat(depths_out, tnfs_out), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(_critic(x))**2
@@ -243,22 +227,20 @@ class AAEDEC(nn.Module):
             print("\tN sequences:", ncontigs, file=logfile)
             print("\tN samples:", self.nsamples, file=logfile, end="\n\n")
 
-        disc_z_params = []
-        disc_y_params = []
+        disc_params = []
 
         for name, param in self.named_parameters():
-            if "discriminator_z" in name:
-                disc_z_params.append(param)
-            elif "discriminator_y" in name:
-                disc_y_params.append(param)
+            if "discriminator" in name:
+                disc_params.append(param)
 
-        optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lrate)
-        optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
+        optimizer_D_z = torch.optim.Adam(disc_params, lr=lrate)
         (
-        D_z_loss_e,
-        D_y_loss_e,) = (0,0)
+        D_loss_e,
+        ) = (0)
 
         for i in range(max_iter_dis):
+            
+            time_epoch_0 = time.time()
             self.train()
             data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
@@ -267,58 +249,42 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
             
-            for depths_in, tnf_in in data_loader:
+            for depths_in, tnfs_in in data_loader:
             
                 depths_in.requires_grad = True
-                tnf_in.requires_grad = True
+                tnfs_in.requires_grad = True
                 optimizer_D_z.zero_grad()
+                _, detphs_out, tnfs_out = self(depths_in, tnfs_in)
+                loss = self.discriminator_loss(torch.cat(depths_in, tnfs_in, dim=1), torch.cat(detphs_out, tnfs_out, dim=1), device)
+                loss.backward()
+                optimizer_D_z.step()
+                D_z_loss_e += loss.item()
+
+                time_epoch_1 = time.time()
+                time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
                 
-                discriminator_loss(, , device)
-                
-                
-                
+        
             
         return
 
-    ## Reparametrisation trick
-    def _reparameterization(self, mu, logvar):
-
-        Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
-
-        std = torch.exp(logvar / 2)
-        sampled_z = Variable(Tensor(np.random.normal(0, 1, (mu.size(0), self.ld))))
-
-        if self.usecuda:
-            sampled_z = sampled_z.cuda()
-        z = sampled_z * std + mu
-
-        return z
 
     ## Encoder
     def _encode(self, depths, tnfs):
         _input = torch.cat((depths, tnfs), 1)
         x = self.encoder(_input)
         mu = self.mu(x)
-        logvar = self.logvar(x)
-        _y = self.y_vector(x)
-        y = F.softmax(_y, dim=1)
-
-        return mu, logvar, y
+        return mu
 
     def y_length(self):
         return self.y_len
-
-    def z_length(self):
-        return self.ld
 
     def samples_num(self):
         return self.nsamples
 
     ## Decoder
-    def _decode(self, z, y):
-        z_y = torch.cat((z, y), 1)
+    def _decode(self, z):
 
-        reconstruction = self.decoder(z_y)
+        reconstruction = self.decoder(z)
 
         _depths_out, tnf_out = (
             reconstruction[:, : self.nsamples],
@@ -329,14 +295,10 @@ class AAEDEC(nn.Module):
 
         return depths_out, tnf_out
 
-    ## Discriminator Z space (continuous latent space defined by mu and sigma layers)
-    def _discriminator_z(self, z):
-        return self.discriminator_z(z)
+    ## Discriminator
+    def _discriminator(self, x):
+        return self.discriminator(x)
 
-    ## Discriminator Y space (categorical latent space defined by Y layer)
-
-    def _discriminator_y(self, y):
-        return self.discriminator_y(y)
 
     @classmethod
     def load(cls, path, cuda=False, evaluate=True, c=False):
@@ -402,11 +364,10 @@ class AAEDEC(nn.Module):
         return loss, ce, sse
 
     def forward(self, depths_in, tnfs_in):
-        mu, logvar, y_latent = self._encode(depths_in, tnfs_in)
-        z_latent = self._reparameterization(mu, logvar)
-        depths_out, tnfs_out = self._decode(z_latent, y_latent)
+        mu = self._encode(depths_in, tnfs_in)
+        depths_out, tnfs_out = self._decode(mu)
 
-        return mu, logvar, depths_out, tnfs_out
+        return mu, depths_out, tnfs_out
 
     # ----------
     #  Training
