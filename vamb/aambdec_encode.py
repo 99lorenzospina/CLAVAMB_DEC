@@ -87,7 +87,7 @@ class AAEDEC(nn.Module):
 
         # discriminator z
         self.discriminator_z = nn.Sequential(
-            nn.Linear(self.ld, self.h_n),
+            nn.Linear(self.input_length, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
@@ -97,7 +97,7 @@ class AAEDEC(nn.Module):
 
         # discriminator Y
         self.discriminator_y = nn.Sequential(
-            nn.Linear(self.y_len, self.h_n),
+            nn.Linear(self.input_length, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
@@ -120,7 +120,7 @@ class AAEDEC(nn.Module):
     def _critic(self, c):
         return self.critic(c)
     
-    def pretrain(self, dataloader, max_iter, lr, cri_lr):
+    def pretrain(self, dataloader, max_iter):
         lr = self.lr
         cri_lr = self.lr
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
@@ -172,7 +172,7 @@ class AAEDEC(nn.Module):
                                     pin_memory=dataloader.pin_memory)
             
             for depths_in, tnf_in in data_loader:
-                n.requires_grad = True
+                depths_in.requires_grad = True
                 tnf_in.requires_grad = True
                 a = random.random()
                 b = random.random()
@@ -213,6 +213,71 @@ class AAEDEC(nn.Module):
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
                 
+        return optimizer_E, optimizer_D
+
+    def discriminator_loss(real_output, fake_output, device):
+        real_loss = torch.nn.BCEWithLogitsLoss(real_output, torch.ones_like(real_output, device=device))
+        fake_loss = torch.nn.BCEWithLogitsLoss(fake_output, torch.zeros_like(fake_output, device=device))
+        total_loss = real_loss + fake_loss
+    return total_loss
+
+    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, lr_dis, lr, C, targ_iter, tol, optimizer_E, optimizer_D,
+              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):
+        
+        Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
+        device = "cuda" if self.usecuda else "cpu"
+        depthstensor, tnftensor = dataloader.dataset.tensors
+        ncontigs, nsamples = depthstensor.shape
+
+        # Pretrain discriminators
+
+        if logfile is not None:
+            print("\tNetwork properties:", file=logfile)
+            print("\tCUDA:", self.usecuda, file=logfile)
+            print("\tAlpha:", self.alpha, file=logfile)
+            print("\tY length:", self.y_len, file=logfile)
+            print("\tZ length:", self.ld, file=logfile)
+            print("\n\tTraining properties:", file=logfile)
+            print("\tN Training epochs:", max_iter, file=logfile)
+            print("\tStarting batch size:", data_loader.batch_size, file=logfile)
+            print("\tN sequences:", ncontigs, file=logfile)
+            print("\tN samples:", self.nsamples, file=logfile, end="\n\n")
+
+        disc_z_params = []
+        disc_y_params = []
+
+        for name, param in self.named_parameters():
+            if "discriminator_z" in name:
+                disc_z_params.append(param)
+            elif "discriminator_y" in name:
+                disc_y_params.append(param)
+
+        optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lrate)
+        optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
+        (
+        D_z_loss_e,
+        D_y_loss_e,) = (0,0)
+
+        for i in range(max_iter_dis):
+            self.train()
+            data_loader = _DataLoader(dataset=dataloader.dataset,
+                                    batch_size=dataloader.batch_size,
+                                    shuffle=True,
+                                    drop_last=False,
+                                    num_workers=dataloader.num_workers,
+                                    pin_memory=dataloader.pin_memory)
+            
+            for depths_in, tnf_in in data_loader:
+            
+                depths_in.requires_grad = True
+                tnf_in.requires_grad = True
+                optimizer_D_z.zero_grad()
+                
+                discriminator_loss(, , device)
+                
+                
+                
+            
         return
 
     ## Reparametrisation trick
@@ -336,14 +401,12 @@ class AAEDEC(nn.Module):
         loss = ce * ce_weight + sse * sse_weight
         return loss, ce, sse
 
-    def forward(self, depths_in, tnfs_in, z_prior, y_prior):
+    def forward(self, depths_in, tnfs_in):
         mu, logvar, y_latent = self._encode(depths_in, tnfs_in)
         z_latent = self._reparameterization(mu, logvar)
         depths_out, tnfs_out = self._decode(z_latent, y_latent)
-        d_z_latent = self._discriminator_z(z_latent)
-        d_y_latent = self._discriminator_y(y_latent)
 
-        return mu, logvar, depths_out, tnfs_out, z_latent, y_latent, d_z_latent, d_y_latent
+        return mu, logvar, depths_out, tnfs_out
 
     # ----------
     #  Training
