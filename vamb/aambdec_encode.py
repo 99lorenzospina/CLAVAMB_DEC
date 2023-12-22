@@ -208,7 +208,7 @@ class AAEDEC(nn.Module):
     return total_loss
 
     def train(self, dataloader, max_iter, aux_iter, max_iter_dis, lr_dis, lr, C, targ_iter, tol, optimizer_E, optimizer_D,
-              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):    #C must be a list of centroids (vectors)
+              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):    #C must be a list of centroids (vectors), implicitly labeled by order
         
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         device = "cuda" if self.usecuda else "cpu"
@@ -288,15 +288,15 @@ class AAEDEC(nn.Module):
                     mu = _encode(depths_in, tnfs_in)
                     for i in range(len(mu)):    #consider each sample separately
                         mu_i = mu[i]
-                        q_ij_values = []
+                        q_ij_values = np.empty(self.y_len)
                         denominator = np.sum([student_t_distribution(mu_i, c) for c in C])
                         for c in C:
                             numerator = student_t_distribution(mu_i, c)
                             q_ij = numerator / denominator
                             q_ij_values.append(q_ij)
                         y_pred_old[i] = y_pred[i]
-                        y_pred[i] = max(q_ij_values)    #cluster assignment for sample i
-                        Q = np.vstack(Q, q_ij_values
+                        y_pred[i] = np.argmax(q_ij_values)    #cluster assignment for sample i
+                        Q = np.vstack(Q, q_ij_values)
                     for col in range(Q.shape[1]):
                         P[:, col] = np.sum(Q[:, col])    #P contains the freq_qj, each column one frequence
                     temp = np.empty_like(P)
@@ -308,9 +308,12 @@ class AAEDEC(nn.Module):
                             P[i,j] = temp[i,j]/ np.sum(temp[i,:])
                     #now P contains what I wanted
                     del temp
-                    if (np.sum(y_pred != y_pred_old)< tol*dataloader.batchsize):    #cannot improve this batch anymore
+                    if (np.sum(y_pred != y_pred_old)< tol*dataloader.batch_size):    #cannot improve this batch anymore
                         break
-                    
+                loss_g =
+                loss_d =
+                loss_cls =
+                
                         
             time_epoch_1 = time.time()
             time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
