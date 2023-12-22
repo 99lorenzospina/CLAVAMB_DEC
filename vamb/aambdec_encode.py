@@ -32,6 +32,9 @@ class AAEDEC(nn.Module):
         nlatent_y, #careful: nlatent_y should be the number of estimated clusters
         sl: float,
         slr: float,
+        lr: float,
+        cri_lr: float,
+        dis_lr: float,
         alpha: Optional[float],
         _cuda: bool,
         contrast: bool = False,
@@ -57,7 +60,8 @@ class AAEDEC(nn.Module):
         self.usecuda = _cuda
         self.contrast = contrast
         self.lr = lr
-        self.cri_lr = lr
+        self.cri_lr = cri_lr
+        self.dis_lr = dis_lr
         self.degrees = degrees
 
         # encoder
@@ -112,7 +116,7 @@ class AAEDEC(nn.Module):
     
     def pretrain(self, dataloader, max_iter):
         lr = self.lr
-        cri_lr = self.lr
+        cri_lr = self.cri_lr
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         depthstensor, tnftensor = dataloader.dataset.tensors
         ncontigs, nsamples = depthstensor.shape
@@ -180,12 +184,12 @@ class AAEDEC(nn.Module):
                     a = 1 - a
                 
                 r_depths_out, r_tnfs_out = self._decode(z)
-                x = torch.cat(r_depths_out, r_tnfs_out)
+                x = torch.cat((r_depths_out, r_tnfs_out))
                 mu = self._encode(depths_in, tnfs_in)
                 depths_out, tnfs_out = self._decode(mu)
-                reg_term = _critic(b*torch.cat(depths_in, tnf_in) + (1-b)*torch.cat(depths_out, tnfs_out)).pow(2).sum(dim=1).mean()
+                reg_term = _critic(b*torch.cat((depths_in, tnf_in)) + (1-b)*torch.cat((depths_out, tnfs_out))).pow(2).sum(dim=1).mean()
                 crit_loss = torch.abs(_critic(x) - torch.tensor(a, torch.float))**2 + reg_term
-                ed_loss = (torch.dist(torch.cat(depths_in, tnf_in), torch.cat(depths_out, tnfs_out), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(_critic(x))**2
+                ed_loss = (torch.dist(torch.cat((depths_in, tnf_in)), torch.cat((depths_out, tnfs_out)), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(_critic(x))**2
 
                 ed_loss.backward()                
                 optimizer_E.step()
@@ -207,8 +211,24 @@ class AAEDEC(nn.Module):
         total_loss = real_loss + fake_loss
     return total_loss
 
-    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, lr_dis, lr, C, targ_iter, tol, optimizer_E, optimizer_D,
-              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):    #C must be a list of centroids (vectors), implicitly labeled by order
+    def calculate_kld(p, q):
+        # Ensure the arrays are probability distributions (sum to 1)
+        p = p / np.sum(p)
+        q = q / np.sum(q)
+    
+        # Avoid division by zero by adding a small epsilon
+        epsilon = 1e-10
+    
+        # Calculate KLD
+        kld = np.sum(p * np.log((p + epsilon) / (q + epsilon)))
+
+    return kld
+
+
+    #STILL TO DO: deal with y_pred vector (all the contigs? How to do with batches?) and for the breakout option
+    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, C, targ_iter, tol, optimizer_E, optimizer_D,
+              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):
+        #C must be a torch.tensor of centroids (vectors), implicitly labeled by order
         
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         device = "cuda" if self.usecuda else "cpu"
@@ -234,13 +254,12 @@ class AAEDEC(nn.Module):
             if "discriminator" in name:
                 disc_params.append(param)
 
-        optimizer_D_z = torch.optim.Adam(disc_params, lr=lrate)
-        (
-        D_loss_e,
-        ) = (0)
+        optimizer_D_z = torch.optim.Adam(disc_params, lr=lrate)   
 
         for i in range(max_iter_dis):
-            
+            (
+            G_loss,
+            ) = (0)
             time_epoch_0 = time.time()
             self.train()
             data_loader = _DataLoader(dataset=dataloader.dataset,
@@ -256,15 +275,16 @@ class AAEDEC(nn.Module):
                 tnfs_in.requires_grad = True
                 optimizer_D_z.zero_grad()
                 _, detphs_out, tnfs_out = self(depths_in, tnfs_in)
-                loss = self.discriminator_loss(torch.cat(depths_in, tnfs_in, dim=1), torch.cat(detphs_out, tnfs_out, dim=1), device)
+                loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1), device)
                 loss.backward()
                 optimizer_D_z.step()
-                D_z_loss_e += loss.item()
+                G_loss += loss.item()
 
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
 
         #Clustering phase
+
 
         data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
@@ -272,26 +292,31 @@ class AAEDEC(nn.Module):
                                     drop_last=False,
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
-        
+
         for h in range(max_iter):
             time_epoch_0 = time.time()
             self.train()
+
+            (D_loss,
+             Cls_loss,
+             G_loss,)
+            = (0,0,0)
             
             Q = np.empty((0, self.y_len))
             P = np.empty_like(Q)
             y_pred = np.zeros(dataloader.batch_size)    #save the cluster for each sample
             y_pred_old = y_pred
             for depths_in, tnf_in in data_loader
+                depths_in.requires_grad = True
+                tnf_in.requires_grad = True
                 if h%targ_iter == 0:
-                    depths_in.requires_grad = True
-                    tnf_in.requires_grad = True
                     mu = _encode(depths_in, tnfs_in)
                     for i in range(len(mu)):    #consider each sample separately
                         mu_i = mu[i]
                         q_ij_values = np.empty(self.y_len)
-                        denominator = np.sum([student_t_distribution(mu_i, c) for c in C])
-                        for c in C:
-                            numerator = student_t_distribution(mu_i, c)
+                        denominator = np.sum([self.student_t_distribution(mu_i, c) for _,c in optimizer_C.state_dict().items()])
+                        for _,c in optimizer_C.state_dict().items():
+                            numerator = self.student_t_distribution(mu_i, c)
                             q_ij = numerator / denominator
                             q_ij_values.append(q_ij)
                         y_pred_old[i] = y_pred[i]
@@ -310,9 +335,26 @@ class AAEDEC(nn.Module):
                     del temp
                     if (np.sum(y_pred != y_pred_old)< tol*dataloader.batch_size):    #cannot improve this batch anymore
                         break
-                loss_g =
-                loss_d =
-                loss_cls =
+                loss_g = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1), device)
+                loss_d = torch.nn.MSEloss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1))
+                loss_cls = torch.nn.BCEWithLogitsLoss(torch.cat((detphs_out, tnfs_out), dim=1), torch.zeros_like(torch.cat((detphs_out, tnfs_out), dim=1), device=device))
+                loss_cls += self.kld(P,Q)
+                if (h % aux_iter <= (aux_iter/2)):
+                    optimizer_D.zero_grad()
+                    loss_d.backward()
+                    optimizer_D.step()                             
+                else:
+                    optimizer_E.zero_grad()
+                    loss_cls.backward()
+                    C = C - self.lr * loss_cls.grad
+                    optimizer_E.step() 
+                    optimizer_C.step()
+                    optimizer_D.zero_grad()
+                    loss_d.backward()
+                    optimizer_D.step()         
+                    optimizer_D_z.zero_grad()
+                    loss_g.backward()
+                    optimizer_D_z.step()
                 
                         
             time_epoch_1 = time.time()
@@ -325,7 +367,7 @@ class AAEDEC(nn.Module):
     dist_squared = np.sum((z - c) ** 2)
 
     # Calcola il numeratore della formula q_ij
-    numerator = (1 + dist_squared / self.degrees) ** (- (self.degreesn + 1) / 2)
+    numerator = (1 + dist_squared / self.degrees) ** (- (self.degrees + 1) / 2)
 
     return numerator
     
