@@ -35,6 +35,7 @@ class AAEDEC(nn.Module):
         alpha: Optional[float],
         _cuda: bool,
         contrast: bool = False,
+        degrees: int = 1,
     ):
         if nsamples is None:
             raise ValueError(
@@ -57,6 +58,7 @@ class AAEDEC(nn.Module):
         self.contrast = contrast
         self.lr = lr
         self.cri_lr = lr
+        self.degrees = degrees
 
         # encoder
         self.encoder = nn.Sequential(
@@ -206,7 +208,7 @@ class AAEDEC(nn.Module):
     return total_loss
 
     def train(self, dataloader, max_iter, aux_iter, max_iter_dis, lr_dis, lr, C, targ_iter, tol, optimizer_E, optimizer_D,
-              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):
+              logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None):    #C must be a list of centroids (vectors)
         
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         device = "cuda" if self.usecuda else "cpu"
@@ -219,8 +221,7 @@ class AAEDEC(nn.Module):
             print("\tNetwork properties:", file=logfile)
             print("\tCUDA:", self.usecuda, file=logfile)
             print("\tAlpha:", self.alpha, file=logfile)
-            print("\tY length:", self.y_len, file=logfile)
-            print("\tZ length:", self.ld, file=logfile)
+            print("\tN clusters:", self.y_len, file=logfile)
             print("\n\tTraining properties:", file=logfile)
             print("\tN Training epochs:", max_iter, file=logfile)
             print("\tStarting batch size:", data_loader.batch_size, file=logfile)
@@ -262,12 +263,54 @@ class AAEDEC(nn.Module):
 
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
-                
-        
+
+        #Clustering phase
+
+        for h in range(max_iter):
+            time_epoch_0 = time.time()
+            self.train()
+            data_loader = _DataLoader(dataset=dataloader.dataset,
+                                    batch_size=dataloader.batch_size,
+                                    shuffle=True,
+                                    drop_last=False,
+                                    num_workers=dataloader.num_workers,
+                                    pin_memory=dataloader.pin_memory)
+            Q = np.empty((0, self.y_len))
+            P = np.empty((0, self.y_len))
+            y_pred = np.zeros(dataloader.batch_size)    #save the cluster for each sample
+            y_pred_old = y_pred
+            if h%targ_iter == 0:
+                for depths_in, tnf_in in data_loader:
+                    depths_in.requires_grad = True
+                    tnf_in.requires_grad = True
+                    mu = _encode(depths_in, tnfs_in)
+                    for i in range(len(mu)):    #consider each sample separately
+                        mu_i = mu[j]
+                        q_ij_values = []
+                        denominator = np.sum([student_t_distribution(mu_i, c) for c in C])
+                        for c in C:
+                            numerator = student_t_distribution(mu_i, c)
+                            q_ij = numerator / denominator
+                            q_ij_values.append(q_ij)
+                        y_pred_old[i] = y_pred[i]
+                        y_pred[i] = max(q_ij_values)    #cluster assignment for sample i
+                        Q = np.vstack(Q, q_ij_values)
+                    
+                        
+            time_epoch_1 = time.time()
+            time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
             
         return
 
+    def student_t_distribution(z, c):
+    # Calcola la distanza tra i vettori z_i e c_j
+    dist_squared = np.sum((z - c) ** 2)
 
+    # Calcola il numeratore della formula q_ij
+    numerator = (1 + dist_squared / self.degrees) ** (- (self.degreesn + 1) / 2)
+
+    return numerator
+    
     ## Encoder
     def _encode(self, depths, tnfs):
         _input = torch.cat((depths, tnfs), 1)
