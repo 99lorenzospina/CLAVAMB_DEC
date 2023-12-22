@@ -266,26 +266,28 @@ class AAEDEC(nn.Module):
 
         #Clustering phase
 
-        for h in range(max_iter):
-            time_epoch_0 = time.time()
-            self.train()
-            data_loader = _DataLoader(dataset=dataloader.dataset,
+        data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
                                     shuffle=True,
                                     drop_last=False,
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
+        
+        for h in range(max_iter):
+            time_epoch_0 = time.time()
+            self.train()
+            
             Q = np.empty((0, self.y_len))
-            P = np.empty((0, self.y_len))
+            P = np.empty_like(Q)
             y_pred = np.zeros(dataloader.batch_size)    #save the cluster for each sample
             y_pred_old = y_pred
-            if h%targ_iter == 0:
-                for depths_in, tnf_in in data_loader:
+            for depths_in, tnf_in in data_loader
+                if h%targ_iter == 0:
                     depths_in.requires_grad = True
                     tnf_in.requires_grad = True
                     mu = _encode(depths_in, tnfs_in)
                     for i in range(len(mu)):    #consider each sample separately
-                        mu_i = mu[j]
+                        mu_i = mu[i]
                         q_ij_values = []
                         denominator = np.sum([student_t_distribution(mu_i, c) for c in C])
                         for c in C:
@@ -294,7 +296,20 @@ class AAEDEC(nn.Module):
                             q_ij_values.append(q_ij)
                         y_pred_old[i] = y_pred[i]
                         y_pred[i] = max(q_ij_values)    #cluster assignment for sample i
-                        Q = np.vstack(Q, q_ij_values)
+                        Q = np.vstack(Q, q_ij_values
+                    for col in range(Q.shape[1]):
+                        P[:, col] = np.sum(Q[:, col])    #P contains the freq_qj, each column one frequence
+                    temp = np.empty_like(P)
+                    for i in range(len(mu)):
+                        for j in range(self.y_len):
+                            temp[i,j] = Q[i,j] ** 2 / P[i,j]
+                    for i in range(len(mu)):
+                        for j in range(self.y_len):
+                            P[i,j] = temp[i,j]/ np.sum(temp[i,:])
+                    #now P contains what I wanted
+                    del temp
+                    if (np.sum(y_pred != y_pred_old)< tol*dataloader.batchsize):    #cannot improve this batch anymore
+                        break
                     
                         
             time_epoch_1 = time.time()
