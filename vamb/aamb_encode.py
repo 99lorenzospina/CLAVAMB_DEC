@@ -176,8 +176,8 @@ class AAE(nn.Module):
       """
 
       # Forcably load to CPU even if model was saves as GPU model
-      # dictionary = _torch.load(path, map_location=lambda storage, loc: storage)
-      dictionary = _torch.load(path)
+      # dictionary = torch.load(path, map_location=lambda storage, loc: storage)
+      dictionary = torch.load(path)
       nsamples = dictionary['nsamples']
       alpha = dictionary['alpha']
       beta = dictionary['beta']
@@ -451,7 +451,7 @@ class AAE(nn.Module):
               mu1, logvar1, depths_out1, tnf_out_aug1, z_latent1, y_latent1, d_z_latent1, d_y_latent1 = self(depths_in, tnf_aug1, z_prior, y_prior)
               mu2, logvar2, depths_out2, tnf_out_aug2, z_latent2, y_latent2, d_z_latent2, d_y_latent2 = self(depths_in, tnf_aug2, z_prior, y_prior)
 
-              loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature) #shouldn't be self.nt_xent_loss(_torch.cat((depths_out1, tnf_out1), 1), _torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)?
+              loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature) #shouldn't be self.nt_xent_loss(torch.cat((depths_out1, tnf_out1), 1), torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)?
               loss_contrast2 = self.nt_xent_loss(tnf_out_aug2, tnfs_out, temperature=hparams.temperature)
               loss_contrast3 = self.nt_xent_loss(tnfs_out, tnf_out_aug1, temperature=hparams.temperature)
 
@@ -689,7 +689,7 @@ class AAE(nn.Module):
                   zscore(aug_arr1, axis=0, inplace=True)
                   zscore(aug_arr2, axis=0, inplace=True)
                   aug_tensor1, aug_tensor2 = torch.from_numpy(aug_arr1), torch.from_numpy(aug_arr2)
-                  # print('augtensor', _torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
+                  # print('augtensor', torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
                   # if aug_tensor1 == aug_tensor2, reloop
                   shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath)
                   aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
