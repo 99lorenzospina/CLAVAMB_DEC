@@ -35,7 +35,7 @@
  from pyclustering.cluster.kmeans import kmeans
  from pyclustering.utils import distance_metric, type_metric
  
- 
+
  class SpeciesNumber:
      """!
      @brief Class implements G-Means clustering algorithm.
@@ -296,18 +296,25 @@
 
  
          if len(new_centers) > 1:
+             v = numpy.subtract(new_centers[0], new_centers[1])
+             square_norm = numpy.sum(numpy.multiply(v, v))
+             points = numpy.divide(numpy.sum(numpy.multiply(new_centers, vector), axis=1), square_norm)
              normalized_cluster_data = (points - numpy.mean(points, axis=0)) / np.std(points, axis=0)
              sorted_data = numpy.sort(normalized_cluster_data, axis=0)
-             ecdf = numpy.arange(1, len(points) + 1) / len(cluster_indices)
-             cdf = norm.cdf(sorted_data)
-             KS = scipy.stats.ks_2samp(ecdf, cdf)
+             cdf = scipy.stats.norm.cdf(sorted_data)
+             num_features = sorted_data.shape[1]
+             ecdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+             KS = self.ks(ecdf_dict, cdf)
              accept_null_hypothesis = KS.pvalue > 0.05
              if not accept_null_hypothesis:
                  return new_centers, True   # If null hypothesis is rejected then use two new clusters
  
          return points, False
  
- 
+     def ks(self, ecdf, cdf):
+      
+      return
+  
      def _search_optimal_parameters(self, data, amount):
          """!
          @brief Performs cluster analysis for specified data several times to find optimal clustering result in line
