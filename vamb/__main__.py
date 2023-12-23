@@ -527,6 +527,8 @@ def run(
         return None
     log(f"\nTNF and coabundances generated in {time_generating_input}", logfile, 1)
 
+    #Estimate number of clusters here
+
     if 'vae' in model_selection:
         begin_train_vae=time.time()/60
         # Train, save model
