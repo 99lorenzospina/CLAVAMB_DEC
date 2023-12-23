@@ -39,3 +39,4 @@ from . import cluster
 from . import benchmark
 from . import encode
 from . import mimics
+from . import species_number
