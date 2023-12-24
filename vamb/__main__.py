@@ -527,7 +527,16 @@ def run(
         return None
     log(f"\nTNF and coabundances generated in {time_generating_input}", logfile, 1)
 
-    #Estimate number of clusters here
+    #Estimate number of clusters
+    log("Estimate the number of clusters")
+    begintime = time.time()/60
+    estimator = vamb.species_number.SpeciesNumber(np.concatenate((composition.matrix, abundance.matrix), axis=1))
+    estimator.process()
+    nlatent_aae_y = estimator.estimate_k()
+    timepoint_gernerate_input=time.time()/60
+    time_generating_input= round(timepoint_gernerate_input-begintime,2)
+    log(f"\nCluster estimated in {time_generating_input}", logfile, 1)
+    log(f"\Estimated {nlatent_aae_y} clusters", logfile, 1)
 
     if 'vae' in model_selection:
         begin_train_vae=time.time()/60
