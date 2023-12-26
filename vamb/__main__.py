@@ -393,7 +393,7 @@ def write_fasta(
     outdir: str,
     clusterspath: str,
     fastapath: str,
-    contignames: np.ndarray,  # of object
+    contignames: np.ndarray,
     contiglengths: np.ndarray,
     minfasta: int,
     logfile: IO[str],
