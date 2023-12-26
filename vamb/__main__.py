@@ -138,7 +138,7 @@ def calc_rpkm(
         vamb.vambtools.write_npz(os.path.join(outdir, 'rpkm.npz'), rpkms)
         shutil.rmtree(dumpdirectory)
 
-    if len(rpkms) != len(comp_metadata):
+    if len(rpkms) != ncontigs:
         raise ValueError("Length of TNFs and length of RPKM does not match. Verify the inputs")
 
     elapsed = round(time.time() - begintime, 2)
