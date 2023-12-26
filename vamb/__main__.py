@@ -134,8 +134,8 @@ def calc_rpkm(
     elif jgipath is not None:
         log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
         with open(jgipath) as file:
-            rpkms = vamb.parsebam.load_jgi(file, mincontiglength, comp_metadata.refhash if verify_refhash else None)
-            abundance = vamb.parsebam.Abundance(rpkms, comp_metadata, minid, comp_metadata.refhash if verify_refhash else None)
+            rpkms = vamb.vambtools.load_jgi(file, mincontiglength, comp_metadata.refhash if verify_refhash else None)
+            abundance = vamb.parsebam.Abundance(rpkms, [jgipath], minid, comp_metadata.refhash if verify_refhash else None)
     else:
         assert bampaths is not None
         log(f"Parsing {len(bampaths)} BAM files with {nthreads} threads", logfile, 1)
@@ -266,7 +266,7 @@ def trainaae(
 
     begintime = time.time()/60
     log("\nCreating and training AAE", logfile)
-    nsamples = rpkms.shape[1]
+    nsamples = rpkms.shape[1]    #number of contigs
 
     # basic config for contrastive learning
     aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
@@ -313,7 +313,7 @@ def trainaae(
     log("Encoding to latent representation", logfile, 1)
     clusters_y_dict,latent = aae.get_latents(contignames, dataloader)
     vamb.vambtools.write_npz(os.path.join(outdir, "aae_z_latent.npz"), latent)
-    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict)
+    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict) #this is computed at the end of cluster()
 
     del aae  # Needed to free "latent" array's memory references?
 
@@ -470,7 +470,8 @@ def run(
     dropout: Optional[float],
     sl: float,
     slr: float,
-    lrate: float,
+    lrate_vae: float,
+    lrate_aae: float,
     batchsteps: list[int],
     batchsteps_aae: list[int],
     windowsize: int,
@@ -561,7 +562,7 @@ def run(
             cuda,
             batchsize,
             nepochs,
-            lrate,
+            lrate_vae,
             batchsteps,
             logfile,
         )
@@ -593,7 +594,7 @@ def run(
             cuda,
             batchsize_aae,
             nepochs_aae,
-            lrate,
+            lrate_aae,
             batchsteps_aae,
             logfile,
             composition.metadata.identifiers,
@@ -919,7 +920,7 @@ def main():
     )
     trainos.add_argument(
         "-r",
-        dest="lrate",
+        dest="lrate_vae",
         metavar="",
         type=float,
         default=1e-3,
@@ -1285,7 +1286,8 @@ def main():
             dropout=dropout,
             sl=args.sl,
             slr=args.slr,
-            lrate=lrate,
+            lrate_vae=lrate_vae,
+            lrate_aae=lrate_aae,
             batchsteps=batchsteps,
             batchsteps_aae=batchsteps_aae,
             windowsize=windowsize,
