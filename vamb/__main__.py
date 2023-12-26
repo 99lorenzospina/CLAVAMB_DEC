@@ -452,7 +452,8 @@ def run(
     norefcheck: bool,
     noencode: bool,
     minid: float,
-    temperature: float,
+    vae_temperature: float,
+    aee_temperature: float,
     nthreads: int,
     nhiddens: Optional[list[int]],
     nhiddens_aae: Optional[list[int]],
@@ -550,6 +551,7 @@ def run(
             augmode,
             augdatashuffle,
             augmentationpath,
+            vae_temperature,
             composition.metadata.lengths,
             nhiddens,
             nlatent,
@@ -579,7 +581,7 @@ def run(
             augmode,
             augdatashuffle,
             augmentationpath,
-            temperature,
+            aee_temperature,
             composition.metadata.lengths,
             nhiddens_aae,
             nlatent_aae_z,
@@ -735,8 +737,8 @@ def main():
     Default use, good for most datasets:
     vamb --outdir out --fasta my_contigs.fna --bamfiles *.bam -o C 
 
-    For advanced use and extensions of Avamb, check documentation of the package
-    at https://github.com/RasmussenLab/vamb.""" # must be updated with the new github
+    For advanced use and extensions of CL-Avamb, check documentation of the package
+    at https://github.com/99lorenzospina/CLAVAMB_DEC/tree/avamb_new."""
     parser = argparse.ArgumentParser(
         prog="vamb",
         description=doc,
@@ -751,7 +753,7 @@ def main():
     helpos.add_argument(
         "--version",
         action="version",
-        version=f'Vamb {".".join(map(str, vamb.__version__))}',
+        version=f'CL-Avamb {".".join(map(str, vamb.__version__))}',
     )
 
     # Positional arguments
@@ -781,7 +783,7 @@ def main():
     
     # RPKM arguments
     rpkmos = parser.add_argument_group(
-        title="RPKM input (either BAMs or .npz required)"
+        title="RPKM input (either BAMs or .npz or .jgi required)"
     )
     rpkmos.add_argument(
         "--bamfiles", metavar="", help="paths to (multiple) BAM files", nargs="+"
@@ -890,6 +892,8 @@ def main():
     vaeos.add_argument(
         "--cuda", help="use GPU to train & cluster [False]", action="store_true"
     )
+    vaeos.add_argument('--v_temp', dest='vae_temperature', metavar='', type=float,
+                        default=0.1596, help=' Temperature of the softcategorical prior [0.1596]')
 
     trainos = parser.add_argument_group(title="Training options", description=None)
 
@@ -928,13 +932,13 @@ def main():
                         default=547, help='hidden neurons AAE [547]')
     aaeos.add_argument('--z_aae', dest='nlatent_aae_z', metavar='', type=int,
                         default=283, help='latent neurons AAE continuous latent space  [283]')
-    aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
-                        default=700, help='latent neurons AAE categorical latent space [700]')
+    #aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
+    #                    default=700, help='latent neurons AAE categorical latent space [700]')
     aaeos.add_argument('--sl_aae', dest='sl', metavar='', type=float,
                         default=0.00964, help='loss scale between reconstruction loss and adversarial losses [0.00964] ')
     aaeos.add_argument('--slr_aae', dest='slr', metavar='', type=float,
                         default=0.5, help='loss scale between reconstruction adversarial losses [0.5] ')
-    aaeos.add_argument('--aae_temp', dest='temp', metavar='', type=float,
+    aaeos.add_argument('--a_temp', dest='aae_temperature', metavar='', type=float,
                         default=0.1596, help=' Temperature of the softcategorical prior [0.1596]')
 
     aaetrainos = parser.add_argument_group(title='Training options AAE', description=None)
@@ -1021,7 +1025,7 @@ def main():
 
     nhiddens_aae: Optional[list[int]] = args.nhiddens_aae
     nlatent_aae_z: int = args.nlatent_aae_z
-    nlatent_aae_y: int = args.nlatent_aae_y
+    #nlatent_aae_y: int = args.nlatent_aae_y
 
 
     alpha: Optional[float] = args.alpha
@@ -1039,8 +1043,10 @@ def main():
     batchsteps_aae: list[int] = args.batchsteps_aae
 
     lrate: float = args.lrate
+    vae_temperature: float = args.vae_temperature
     
     lrate_aae: float = args.lrate_aae
+    aae_temperature: float = args.aae_temperature
 
     windowsize: int = args.windowsize
     minsuccesses: int = args.minsuccesses
@@ -1099,7 +1105,7 @@ def main():
         else:
             if 0 < (2 * augmentation_number[0]) ** 2 < args.nepochs or 0 < (2 * augmentation_number[1]) ** 2 < args.nepochs:
                 warnings.warn("Not enough augmentation, regenerate the augmentation to maintain the performance, please use ctrl+C to stop this process in 20 seconds if you would not like the augmentation dir to be rewritten. \
-                    You can choose using the augmentations in the augmentation dir (without specifying --fasta) after interruptting this program, or continuing this program to erase the augmentation dir and regenerate the augmentation data", UserWarning)
+                    You can choose using the augmentations in the augmentation dir (without specifying --fasta) after interrupting this program, or continuing this program to erase the augmentation dir and regenerate the augmentation data", UserWarning)
                 for sleep_time in range(4):
                     print(f'Program to be continued in {20-4*sleep_time}s, please use ctrl+C to stop this process if you would not like the augmentation dir to be rewritten')
                     time.sleep(5)
@@ -1261,7 +1267,8 @@ def main():
             norefcheck=norefcheck,
             noencode=noencode,
             minid=minid,
-            temperature = args.temperature,
+            vae_temperature = vae_temperature,
+            aae_temperature = aee_temperature,
             nthreads=nthreads,
             nhiddens=nhiddens,
             nhiddens_aae=nhiddens_aae,
