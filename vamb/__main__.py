@@ -97,64 +97,54 @@ def calc_tnf(
 
 
 def calc_rpkm(
-    outdir: str,
-    bampaths: Optional[list[str]],
-    npzpath: Optional[str],
-    jgipath: Optional[str],
-    comp_metadata: vamb.parsecontigs.CompositionMetaData,
-    verify_refhash: bool,
-    minid: float,
-    nthreads: int,
-    logfile: IO[str],
-) -> vamb.parsebam.Abundance:
-
-    begintime = time.time()/60
-    log("\nLoading depths", logfile)
-    log(
-        f'Reference hash: {comp_metadata.refhash.hex() if verify_refhash else "None"}',
-        logfile,
-        1,
-    )
-
+    outdir, bampaths, rpkmpath, jgipath, mincontiglength, refhash, ncontigs,
+              minalignscore, minid, subprocesses, logfile
+):
+    begintime = time.time()
+    log('\nLoading RPKM', logfile)
     # If rpkm is given, we load directly from .npz file
-    if npzpath is not None:
-        log(f"Loading depths from npz array {npzpath}", logfile, 1)
-        abundance = vamb.parsebam.Abundance.load(
-            npzpath, comp_metadata.refhash if verify_refhash else None
-        )
-        # I don't want this check in any constructors of abundance, since the constructors
-        # should be able to skip this check in case comp and abundance are independent.
-        # But when running the main Vamb workflow, we need to assert this.
-        if abundance.nseqs != comp_metadata.nseqs:
-            assert not verify_refhash
-            raise ValueError(
-                f"Loaded abundance has {abundance.nseqs} sequences, "
-                f"but composition has {comp_metadata.nseqs}."
-            )
-    elif jgipath is not None:
+    if rpkmpath is not None:
+        log('Loading RPKM from npz array {}'.format(rpkmpath), logfile, 1)
+        rpkms = vamb.vambtools.read_npz(rpkmpath)
+
+        if not rpkms.dtype == np.float32:
+            raise ValueError('RPKMs .npz array must be of float32 dtype')
+    
+    else:
+        log('Reference hash: {}'.format(refhash if refhash is None else refhash.hex()), logfile, 1)
+
+    # Else if JGI is given, we load from that
+    if jgipath is not None:
         log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
         with open(jgipath) as file:
-            rpkms = vamb.vambtools.load_jgi(file, comp_metadata.minlength, comp_metadata.refhash if verify_refhash else None)
-            abundance = vamb.parsebam.Abundance(rpkms, [jgipath], minid, comp_metadata.refhash if verify_refhash else None)
+            rpkms = vamb.vambtools._load_jgi(file, mincontiglength, refhash)
+
     else:
-        assert bampaths is not None
-        log(f"Parsing {len(bampaths)} BAM files with {nthreads} threads", logfile, 1)
+        log('Parsing {} BAM files with {} subprocesses'.format(len(bampaths) if bampaths is not None else 0, subprocesses),
+           logfile, 1)
+        log('Min alignment score: {}'.format(minalignscore), logfile, 1)
+        log('Min identity: {}'.format(minid), logfile, 1)
+        log('Min contig length: {}'.format(mincontiglength), logfile, 1)
+        log('\nOrder of columns is:', logfile, 1)
+        log('\n\t'.join(bampaths), logfile, 1)
+        print('', file=logfile)
 
-        abundance = vamb.parsebam.Abundance.from_files(
-            bampaths, comp_metadata, verify_refhash, minid, nthreads
-        )
-        abundance.save(os.path.join(outdir, "abundance.npz"))
+        dumpdirectory = os.path.join(outdir, 'tmp')
+        rpkms = vamb.parsebam.read_bamfiles(bampaths, dumpdirectory=dumpdirectory,
+                                            refhash=refhash, minscore=minalignscore,
+                                            minlength=mincontiglength, minid=minid,
+                                            subprocesses=subprocesses, logfile=logfile)
+        print('', file=logfile)
+        vamb.vambtools.write_npz(os.path.join(outdir, 'rpkm.npz'), rpkms)
+        shutil.rmtree(dumpdirectory)
 
-    log(f"Min identity: {abundance.minid}\n", logfile, 1)
-    log("Order of columns is:", logfile, 1)
-    log("\n\t".join(abundance.samplenames), logfile, 1)
+    if len(rpkms) != len(comp_metadata):
+        raise ValueError("Length of TNFs and length of RPKM does not match. Verify the inputs")
 
-    elapsed = round(time.time()/60 - begintime, 2)
-    print("", file=logfile)
-    log(f"Processed RPKM in {elapsed} minutes", logfile, 1)
+    elapsed = round(time.time() - begintime, 2)
+    log('Processed RPKM in {} seconds'.format(elapsed), logfile, 1)
 
-    return abundance
-
+    return rpkms
 
 def trainvae(
     outdir: str,
@@ -452,6 +442,7 @@ def run(
     norefcheck: bool,
     noencode: bool,
     minid: float,
+    minalignmentscore: float,
     vae_temperature: float,
     aee_temperature: float,
     nthreads: int,
@@ -505,13 +496,15 @@ def run(
     
     
     # Parse BAMs, save as npz
+    refhash = None if norefcheck else vamb.vambtools._hash_refnames(contignames)
     abundance = calc_rpkm(
         outdir,
         bampaths,
         rpkmpath,
         jgipath,
-        composition.metadata,
-        not norefcheck,
+        refhash,
+        len(composition.metadata.identifiers),
+        minalignmentscore,
         minid,
         nthreads,
         logfile,
@@ -531,7 +524,7 @@ def run(
     # Estimate the number of clusters
     log("Estimate the number of clusters")
     begintime = time.time()/60
-    estimator = vamb.species_number.SpeciesNumber(np.concatenate((composition.matrix, abundance.matrix), axis=1))
+    estimator = vamb.species_number.SpeciesNumber(np.concatenate((composition.matrix, abundance), axis=1))
     estimator.process()
     nlatent_aae_y = estimator.estimate_k()
     timepoint_gernerate_input=time.time()/60
@@ -545,7 +538,7 @@ def run(
         # Train, save model
         mask, latent = trainvae(
             outdir,
-            abundance.matrix,
+            abundance,
             composition.matrix,
             k,
             contrastive_vae,
@@ -575,7 +568,7 @@ def run(
         # Train, save model
         mask, latent_z, clusters_y_dict = trainaae(
             outdir,
-            abundance.matrix,
+            abundance,
             composition.matrix,
             k,
             contrastive_aae,
@@ -811,6 +804,8 @@ def main():
         default=0.0,
         help="ignore reads with nucleotide identity below this [0.0]",
     )
+    inputos.add_argument('-s', dest='minascore', metavar='', type=int, default=None,
+                         help='ignore reads with alignment score below this [None]')
     inputos.add_argument(
         "-p",
         dest="nthreads",
@@ -1017,6 +1012,7 @@ def main():
         )
 
     minid: float = args.minid
+    minalignmentscore : float = args.minascore
     nthreads: int = args.nthreads
     norefcheck: bool = args.norefcheck
     minfasta: Optional[int] = args.minfasta
@@ -1268,6 +1264,7 @@ def main():
             norefcheck=norefcheck,
             noencode=noencode,
             minid=minid,
+            minalignmentscore=minalignmentscore,
             vae_temperature = vae_temperature,
             aae_temperature = aee_temperature,
             nthreads=nthreads,
