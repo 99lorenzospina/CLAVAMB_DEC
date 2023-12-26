@@ -140,3 +140,62 @@ class Abundance:
             abundance.verify_refhash(comp_metadata.refhash)
 
         return abundance
+
+def calc_rpkm(
+    outdir: str,
+    bampaths: Optional[list[str]],
+    npzpath: Optional[str],
+    jgipath: Optional[str],
+    comp_metadata: vamb.parsecontigs.CompositionMetaData,
+    verify_refhash: bool,
+    minid: float,
+    nthreads: int,
+    logfile: IO[str],
+) -> vamb.parsebam.Abundance:
+
+    begintime = time.time()/60
+    log("\nLoading depths", logfile)
+    log(
+        f'Reference hash: {comp_metadata.refhash.hex() if verify_refhash else "None"}',
+        logfile,
+        1,
+    )
+
+    # If rpkm is given, we load directly from .npz file
+    if npzpath is not None:
+        log(f"Loading depths from npz array {npzpath}", logfile, 1)
+        abundance = vamb.parsebam.Abundance.load(
+            npzpath, comp_metadata.refhash if verify_refhash else None
+        )
+        # I don't want this check in any constructors of abundance, since the constructors
+        # should be able to skip this check in case comp and abundance are independent.
+        # But when running the main Vamb workflow, we need to assert this.
+        if abundance.nseqs != comp_metadata.nseqs:
+            assert not verify_refhash
+            raise ValueError(
+                f"Loaded abundance has {abundance.nseqs} sequences, "
+                f"but composition has {comp_metadata.nseqs}."
+            )
+    elif jgipath is not None:
+        log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
+        with open(jgipath) as file:
+            rpkms = vamb.vambtools.load_jgi(file, comp_metadata.minlength, comp_metadata.refhash if verify_refhash else None)
+            abundance = vamb.parsebam.Abundance(rpkms, [jgipath], minid, comp_metadata.refhash if verify_refhash else None)
+    else:
+        assert bampaths is not None
+        log(f"Parsing {len(bampaths)} BAM files with {nthreads} threads", logfile, 1)
+
+        abundance = vamb.parsebam.Abundance.from_files(
+            bampaths, comp_metadata, verify_refhash, minid, nthreads
+        )
+        abundance.save(os.path.join(outdir, "abundance.npz"))
+
+    log(f"Min identity: {abundance.minid}\n", logfile, 1)
+    log("Order of columns is:", logfile, 1)
+    log("\n\t".join(abundance.samplenames), logfile, 1)
+
+    elapsed = round(time.time()/60 - begintime, 2)
+    print("", file=logfile)
+    log(f"Processed RPKM in {elapsed} minutes", logfile, 1)
+
+    return abundance
