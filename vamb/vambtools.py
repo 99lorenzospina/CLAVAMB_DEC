@@ -654,6 +654,14 @@ def binsplit(
         for newbinname, splitheaders in _split_bin(binname, headers, separator):
             yield newbinname, splitheaders
 
+def _hash_refnames(refnames):
+    "Hashes an iterable of strings of reference names using MD5."
+    hasher = _md5()
+    for refname in refnames:
+        hasher.update(refname.encode().rstrip())
+
+    return hasher.digest()
+
 def _load_jgi(filehandle, minlength, refhash):
     "This function can be merged with load_jgi below in the next breaking release (post 3.0)"
     header = next(filehandle)
