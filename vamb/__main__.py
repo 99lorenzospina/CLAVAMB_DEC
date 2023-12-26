@@ -444,9 +444,9 @@ def run(
     augmode: list[int],
     augdatashuffle: bool,
     augmentationpath: Optional[str],
-    compositionpath: Optional[str],  ## ???
+    compositionpath: Optional[str],
     jgipath: Optional[str],
-    bampaths: Optional[list[str]],  #
+    bampaths: Optional[list[str]], 
     rpkmpath: Optional[str],
     mincontiglength: int,
     norefcheck: bool,
@@ -459,7 +459,7 @@ def run(
     nhiddens_aae: Optional[list[int]],
     nlatent: int,
     nlatent_aae_z: int,
-    nlatent_aae_y: int,
+    #nlatent_aae_y: int,
     nepochs: int,
     nepochs_aae: int,
     batchsize: int,
@@ -470,7 +470,6 @@ def run(
     dropout: Optional[float],
     sl: float,
     slr: float,
-    temp: float,
     lrate: float,
     batchsteps: list[int],
     batchsteps_aae: list[int],
@@ -528,7 +527,7 @@ def run(
         return None
     log(f"\nTNF and coabundances generated in {time_generating_input}", logfile, 1)
 
-    #Estimate number of clusters
+    # Estimate the number of clusters
     log("Estimate the number of clusters")
     begintime = time.time()/60
     estimator = vamb.species_number.SpeciesNumber(np.concatenate((composition.matrix, abundance.matrix), axis=1))
@@ -539,6 +538,7 @@ def run(
     log(f"\nCluster estimated in {time_generating_input}", logfile, 1)
     log(f"\Estimated {nlatent_aae_y} clusters", logfile, 1)
 
+    #Training phase
     if 'vae' in model_selection:
         begin_train_vae=time.time()/60
         # Train, save model
@@ -712,7 +712,7 @@ def run(
 
         print("", file=logfile)
         log(f"Clustered {ncontigs} contigs in {clusternumber} bins", logfile, 1)
-        time_start_writin_z_bins=time.time()/60
+        time_start_writin_y_bins=time.time()/60
         if minfasta is not None and fastapath is not None:
             # We have already checked fastapath is not None if minfasta is not None.
             write_fasta(
@@ -726,7 +726,7 @@ def run(
                 separator
             )
         time_writing_bins_y=time.time()/60
-        writing_bins_time_y = round(time_writing_bins_y - time_start_writin_z_bins , 2)
+        writing_bins_time_y = round(time_writing_bins_y - time_start_writin_y_bins , 2)
         log(f"\nAAE y bins written in {writing_bins_time_y} minutes", logfile)
       
 def main():
@@ -1274,7 +1274,7 @@ def main():
             nhiddens_aae=nhiddens_aae,
             nlatent=nlatent,
             nlatent_aae_z=nlatent_aae_z,
-            nlatent_aae_y=nlatent_aae_y,
+            #nlatent_aae_y=nlatent_aae_y,
             nepochs=nepochs,
             nepochs_aae=nepochs_aae,
             batchsize=batchsize,
@@ -1285,7 +1285,6 @@ def main():
             dropout=dropout,
             sl=args.sl,
             slr=args.slr,
-            temp=args.temp,
             lrate=lrate,
             batchsteps=batchsteps,
             batchsteps_aae=batchsteps_aae,
