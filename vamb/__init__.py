@@ -1,5 +1,5 @@
-"""Vamb - Variational Autoencoders for Metagenomic Binning
-Documentation: https://github.com/RasmussenLab/vamb/
+"""CL-AVAMB
+Documentation: https://github.com/99lorenzospina/CLAVAMB_DEC/tree/avamb_new/vamb
 
 Vamb contains the following modules:
 vamb.vambtools
@@ -9,10 +9,11 @@ vamb.encode
 vamb.cluster
 vamb.benchmark
 vamb.mimic
+vamb.aamb_encode
 
 General workflow:
-1) Filter contigs by size using vamb.vambtools.filtercontigs
-2) Map reads to contigs to obtain BAM files
+
+2) Map reads to contigs to obtain BAM files (using minimap2)
 3) Calculate a Composition of contigs using vamb.parsecontigs
 4) Create Abundance object from BAM files using vamb.parsebam
 5) Train autoencoder using vamb.encode
