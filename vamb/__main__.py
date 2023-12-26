@@ -134,7 +134,7 @@ def calc_rpkm(
     elif jgipath is not None:
         log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
         with open(jgipath) as file:
-            rpkms = vamb.vambtools.load_jgi(file, mincontiglength, comp_metadata.refhash if verify_refhash else None)
+            rpkms = vamb.vambtools.load_jgi(file, comp_metadata.minlength, comp_metadata.refhash if verify_refhash else None)
             abundance = vamb.parsebam.Abundance(rpkms, [jgipath], minid, comp_metadata.refhash if verify_refhash else None)
     else:
         assert bampaths is not None
