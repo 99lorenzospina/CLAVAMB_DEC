@@ -10,7 +10,10 @@ import argparse
 import torch
 import datetime
 import time
+import shutil
+import math
 from math import isfinite
+from argparse import Namespace
 from typing import Optional, IO
 
 _ncpu = os.cpu_count()
@@ -44,7 +47,7 @@ def calc_tnf(
     npzpath: Optional[str],
     mincontiglength: int,
     logfile: IO[str],
-    nepocs: int,
+    nepochs: int,
     augmentation_store_dir: str,
     augmode = [-1,-1],
     contrastive=True,
@@ -73,7 +76,7 @@ def calc_tnf(
             log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
             with vamb.vambtools.Reader(fastapath) as file:
               composition = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=mincontiglength, k=k, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode)
-              tnffile.close()
+              file.close()
               composition.save(os.path.join(outdir, "composition.npz"))
 
     ''' composition.save should do the trick
@@ -201,17 +204,17 @@ def trainvae(
 
     if contrastive:
         if True:
-            vae = VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent,alpha=alpha, beta=beta, dropout=dropout, cuda=cuda, c=True)
+            vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent,alpha=alpha, beta=beta, dropout=dropout, cuda=cuda, c=True)
             log("Created VAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
             vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
         else:
             modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_vae.pt")
-            vae = VAE.load(modelpath,cuda=cuda,c=True)
+            vae = vamb.encode.VAE.load(modelpath,cuda=cuda,c=True)
             log("Loaded VAE", logfile, 1)
             vae.to(('cuda' if cuda else 'cpu'))
     else:
-        vae = VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent, alpha=alpha, beta=beta, dropout=dropout, cuda=cuda)
+        vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent, alpha=alpha, beta=beta, dropout=dropout, cuda=cuda)
         log("Created VAE", logfile, 1)
         modelpath = os.path.join(outdir, 'vae_model.pt')
         vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
@@ -244,7 +247,7 @@ def trainaae(
     alpha: Optional[float],  # set automatically if None
     sl: float,
     slr: float,
-    temp: Optional[float] ,
+    temp: Optional[float],
     cuda: bool,
     batchsize: int,
     nepochs: int,
@@ -284,17 +287,17 @@ def trainaae(
 
     if contrastive:
         if True:
-            aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=True)
+            aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, contrast=True)
             log("Created AAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
             aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
         else:
             modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_aae.pt")
             log("Loaded AAE", logfile, 1)
-            aae = AAE.load(modelpath,cuda=cuda,c=True)
+            aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=True)
             aae.to(('cuda' if cuda else 'cpu'))
     else:
-        aae = AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, dropout=dropout, cuda=cuda, contrast=False)
+        aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, cuda=cuda, contrast=False)
         log("Created AAE", logfile, 1)
         modelpath = os.path.join(outdir, 'aae_model.pt')
         aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
@@ -461,6 +464,7 @@ def run(
     dropout: Optional[float],
     sl: float,
     slr: float,
+    aae_temperature: float,
     lrate_vae: float,
     lrate_aae: float,
     batchsteps: list[int],
@@ -475,6 +479,7 @@ def run(
     logfile: IO[str]
 ):
 
+    contrastive = contrastive_aae | contrastive_vae
     if contrastive:
         log('Starting ClAVAmb version ' + '.'.join(map(str, vamb.__version__)), logfile)
     else:
@@ -583,7 +588,7 @@ def run(
             alpha,
             sl,
             slr,
-            temp,
+            aae_temperature,
             cuda,
             batchsize_aae,
             nepochs_aae,
@@ -1266,7 +1271,7 @@ def main():
             minid=minid,
             minalignmentscore=minalignmentscore,
             vae_temperature = vae_temperature,
-            aae_temperature = aee_temperature,
+            aae_temperature = aae_temperature,
             nthreads=nthreads,
             nhiddens=nhiddens,
             nhiddens_aae=nhiddens_aae,

@@ -10,10 +10,17 @@ from torch.distributions.relaxed_categorical import RelaxedOneHotCategorical
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+import math as _math
+from glob import glob
+import warnings
+import random
 
 from torch.utils.data import DataLoader as _DataLoader
+from argparse import Namespace as _Namespace
 
 from typing import Optional
+from vamb.encode import AutomaticWeightedLoss
+import vamb.vambtools
 
 random_seed = 42
 torch.manual_seed(random_seed)
@@ -178,15 +185,17 @@ class AAE(nn.Module):
       # Forcably load to CPU even if model was saves as GPU model
       # dictionary = torch.load(path, map_location=lambda storage, loc: storage)
       dictionary = torch.load(path)
+      ntnf = dictionary['ntnf']
       nsamples = dictionary['nsamples']
       alpha = dictionary['alpha']
-      beta = dictionary['beta']
-      dropout = dictionary['dropout']
       nhiddens = dictionary['nhiddens']
-      nlatent = dictionary['nlatent']
+      nlatent_l = dictionary['nlatent_l']
+      nlatent_y = dictionary['nlatent_y']
+      sl = dictionary['sl']
+      slr = dictionary['slr']
       state = dictionary['state']
 
-      aae = cls(nsamples, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
+      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, c=c)
       aae.load_state_dict(state)
 
       if cuda:
@@ -202,12 +211,15 @@ class AAE(nn.Module):
         Input: Path or binary opened filehandle
         Output: None
         """
-        state = {'nsamples': self.nsamples,
+        state = {
+                 'ntfs': self.ntnf,
+                 'nsamples': self.nsamples,
                  'alpha': self.alpha,
-                 'beta': self.beta,
-                 'dropout': self.dropout,
-                 'nhiddens': self.nhiddens,
-                 'nlatent': self.nlatent,
+                 'nhiddens': self.h_n,
+                 'nlatent_l': self.ld,
+                 'nlatent_y': self.y_len,
+                 'sl' : self.sl,
+                 'slr': self.slr,
                  'state': self.state_dict(),
                 }
 
@@ -240,22 +252,23 @@ class AAE(nn.Module):
     #  Training
     # ----------
 
-    def trainepoch(self, data_loader, epoch, batchsteps, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, awl=None):
+    def trainepoch(self, epoch_i, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl=None, optimizer_awl=None):
         self.train()
         (
             ED_loss_e,
+            loss_e,
             D_z_loss_e,
             D_y_loss_e,
             V_loss_e,
             CE_e,
             SSE_e,
-        ) = (0, 0, 0, 0, 0, 0)
+        ) = (0, 0, 0, 0, 0, 0, 0)
 
         total_batches_inthis_epoch = len(data_loader)
         time_epoch_0 = time.time()
 
         #AAMB
-        if hparams == Namespace():
+        if hparams == _Namespace():
           for depths_in, tnf_in in data_loader:
                 depths_in.requires_grad = True
                 tnf_in.requires_grad = True
@@ -383,7 +396,7 @@ class AAE(nn.Module):
 
                 logfile.flush()
         #CLAMB
-        for depths_in, tnfs_in, tnf_aug1, tnf_aug2 in data_loader:  # weights currently unused here
+        for depths_in, tnfs_in, tnf_aug1, tnf_aug2 in  data_loader:  # weights currently unused here
               nrows, _ = depths_in.shape
 
               depths_in.requires_grad = True
@@ -573,7 +586,7 @@ class AAE(nn.Module):
         return None
     
     def trainmodel(
-        self, dataloader, nepochs=320, lrate=1e-3,
+        self, dataloader, T, nepochs=320, lrate=1e-3,
                    batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None
     ):
 
@@ -630,7 +643,7 @@ class AAE(nn.Module):
         optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
 
         #Contrastive Learning
-        if contrastive:
+        if self.contrast:
           awl = AutomaticWeightedLoss(3)
           optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lrate)
 
@@ -641,9 +654,9 @@ class AAE(nn.Module):
           augmentation_count_number[0] = len(glob(rf'{augmentationpath+os.sep}pool0*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+os.sep}pool0*k{self.k}*_{aug_all_method[hparams.augmode[0]]}_*'))
           augmentation_count_number[1] = len(glob(rf'{augmentationpath+os.sep}pool1*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+os.sep}pool1*k{self.k}*_{aug_all_method[hparams.augmode[1]]}_*'))
 
-          if augmentation_count_number[0] > math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+          if augmentation_count_number[0] > _math.ceil(_math.sqrt(nepochs)) or augmentation_count_number[1] > _math.ceil(_math.sqrt(nepochs)):
               warnings.warn('Too many augmented data, augmented data might not be trained enough. CLAMB do not know how this influence the performance', FutureWarning)
-          elif augmentation_count_number[0] < math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
+          elif augmentation_count_number[0] < _math.ceil(_math.sqrt(nepochs)) or augmentation_count_number[1] > _math.ceil(_math.sqrt(nepochs)):
               raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run VAMB')
 
 
@@ -681,13 +694,13 @@ class AAE(nn.Module):
               '''Avoid training 2 same augmentation data'''
               aug_tensor1, aug_tensor2 = 0, 0
               while(torch.sum(torch.sub(aug_tensor1, aug_tensor2))==0):
-                  aug_arr1, aug_arr2 = read_npz(aug_archive1_file[0]), read_npz(aug_archive2_file[0])
+                  aug_arr1, aug_arr2 = vamb.vambtools.read_npz(aug_archive1_file[0]), vamb.vambtools.read_npz(aug_archive2_file[0])
                   '''Mutate rpkm and tnf array in-place instead of making a copy.'''
-                  aug_arr1 = numpy_inplace_maskarray(aug_arr1, mask)
-                  aug_arr2 = numpy_inplace_maskarray(aug_arr2, mask)
+                  aug_arr1 = vamb.vambtools.numpy_inplace_maskarray(aug_arr1, mask)
+                  aug_arr2 = vamb.vambtools.numpy_inplace_maskarray(aug_arr2, mask)
                   '''Zscore for augmentation data (same as the depth and tnf)'''
-                  zscore(aug_arr1, axis=0, inplace=True)
-                  zscore(aug_arr2, axis=0, inplace=True)
+                  vamb.vambtools.zscore(aug_arr1, axis=0, inplace=True)
+                  vamb.vambtools.zscore(aug_arr2, axis=0, inplace=True)
                   aug_tensor1, aug_tensor2 = torch.from_numpy(aug_arr1), torch.from_numpy(aug_arr2)
                   # print('augtensor', torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
                   # if aug_tensor1 == aug_tensor2, reloop
@@ -707,7 +720,7 @@ class AAE(nn.Module):
                   data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
                       shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
-              self.trainepoch(data_loader, epoch, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, awl)
+              self.trainepoch(epoch, data_loader, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
         
         #Non contrastive learning
         else:
@@ -725,7 +738,7 @@ class AAE(nn.Module):
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(data_loader, epoch, batchsteps_set, logfile, Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor)
+                self.trainepoch(epoch, data_loader, batchsteps_set, logfile, _Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss)
             
 
     ########### function that retrieves the clusters from Y latents
@@ -827,3 +840,48 @@ class AAE(nn.Module):
                 return clust_y_dict, latent
             else:
                 return clust_y_dict
+
+    def nt_xent_loss(self, out_1, out_2, temperature=2, eps=1e-6):
+        """
+            assume out_1 and out_2 are normalized
+            out_1: [batch_size, dim]
+            out_2: [batch_size, dim]
+        """
+        # gather representations in case of distributed training
+        # out_1_dist: [batch_size * world_size, dim]
+        # out_2_dist: [batch_size * world_size, dim]
+        out_1 = _F.normalize(out_1, dim=1)
+        out_2 = _F.normalize(out_2, dim=1)
+
+        out_1_dist = out_1
+        out_2_dist = out_2
+
+        # out: [2 * batch_size, dim]
+        # out_dist: [2 * batch_size * world_size, dim]
+        out = torch.cat([out_1, out_2], dim=0)
+        out_dist = torch.cat([out_1_dist, out_2_dist], dim=0)
+
+        # sum by dim, we set dim=1 since our data are sequences
+        # [2 * batch_size, 2 * batch_size * world_size] or 1
+        # L2_norm = _torch.mm(_torch.sum(_torch.pow(out,2),dim=1,keepdim=True), _torch.sum(_torch.pow(out_dist.t().contiguous(),2),dim=0,keepdim=True))
+        # L2_norm = _torch.clamp(L2_norm, min=eps)
+        L2_norm = 1.
+
+        # cov and sim: [2 * batch_size, 2 * batch_size * world_size]
+        # neg: [2 * batch_size]
+        cov = torch.div(torch.mm(out, out_dist.t().contiguous()), L2_norm)
+        sim = torch.exp(cov / temperature)
+        neg = sim.sum(dim=-1)
+
+        # from each row, subtract e^1 to remove similarity measure for x1.x1
+        row_sub = torch.Tensor(neg.shape).fill_(_math.e).to(neg.device)
+        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+
+        # Positive similarity, pos becomes [2 * batch_size]
+        pos = torch.exp(torch.sum(out_1 * out_2, dim=-1) / temperature)
+        pos = torch.cat([pos, pos], dim=0)
+
+        loss = -torch.log(pos / (neg + eps)).mean()
+        #print('out',out,cov,sim,neg,row_sub,pos)
+
+        return loss

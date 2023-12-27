@@ -163,7 +163,7 @@ class VAE(_nn.Module):
 
     def __init__(
         self,
-        ntf: int, #103
+        ntnf: int, #103
         nsamples: int,
         k: int = 4,
         nhiddens: Optional[list[int]] = None,
@@ -351,6 +351,7 @@ class VAE(_nn.Module):
         epoch: int,
         optimizer,
         batchsteps: list[int],
+        hparams,
         logfile,
         awl = None,
     ) -> _DataLoader[tuple[Tensor, Tensor, Tensor]]:
