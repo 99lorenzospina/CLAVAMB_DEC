@@ -15,6 +15,8 @@ import math
 from math import isfinite
 from argparse import Namespace
 from typing import Optional, IO
+import warnings
+from glob import glob
 
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
@@ -1044,7 +1046,7 @@ def main():
     batchsize_aae: int = args.batchsize_aae
     batchsteps_aae: list[int] = args.batchsteps_aae
 
-    lrate: float = args.lrate
+    lrate_vae: float = args.lrate
     vae_temperature: float = args.vae_temperature
     
     lrate_aae: float = args.lrate_aae
@@ -1166,8 +1168,16 @@ def main():
             f"Minimum 1 neuron per layer, not {min(nhiddens)}"
         )
 
+    if nhiddens_aae is not None and any(i < 1 for i in nhiddens_aae):
+        raise argparse.ArgumentTypeError(
+            f"Minimum 1 neuron per layer, not {min(nhiddens_aae)}"
+        )
+
     if nlatent < 1:
         raise argparse.ArgumentTypeError(f"Minimum 1 latent neuron, not {nlatent}")
+    
+    if nlatent_aae_z < 1:
+        raise argparse.ArgumentTypeError(f"Minimum 1 latent neuron, not {nlatent_aae_z}")
 
     if alpha is not None and (alpha <= 0 or alpha >= 1):
         raise argparse.ArgumentTypeError("alpha must be above 0 and below 1")
@@ -1195,7 +1205,7 @@ def main():
     if min(batchsteps, default=1) < 1:
         raise argparse.ArgumentTypeError("All batchsteps must be 1 or higher")
 
-    if lrate <= 0:
+    if lrate_vae <= 0 or lrate_aae <= 0:
         raise argparse.ArgumentTypeError("Learning rate must be positive")
 
     ###################### CHECK CLUSTERING OPTIONS ####################

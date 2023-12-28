@@ -7,6 +7,11 @@ from torch.optim import Adam as _Adam
 from torch import Tensor
 from torch import nn as _nn
 from math import log as _log
+import argparse
+from glob import glob
+import math
+import warnings
+import random
 
 __doc__ = """Encode a depths matrix and a tnf matrix to latent representation.
 
@@ -138,6 +143,29 @@ def make_dataloader(
 
     return dataloader, mask
 
+class AutomaticWeightedLoss(_nn.Module):
+    """automatically weighted multi-task loss
+    Params：
+        num: int，the number of loss
+        x: multi-task loss
+    Examples：
+        loss1=1
+        loss2=2
+        awl = AutomaticWeightedLoss(2)
+        loss_sum = awl(loss1, loss2)
+    """
+    def __init__(self, num=2):
+        super(AutomaticWeightedLoss, self).__init__()
+        params = _torch.ones(num, requires_grad=True)
+        self.params = _torch.nn.Parameter(params)
+
+    def forward(self, *x):
+        loss_sum = 0
+        for i, loss in enumerate(x):
+            #print(self.params[i].retain_grad(), self.params[i])
+            loss_sum += 0.5 / (self.params[i] ** 2) * loss + _torch.log(1 + self.params[i] ** 2)
+        print('loss_sum',loss_sum)
+        return loss_sum
 
 class VAE(_nn.Module):
     """Variational autoencoder, subclass of torch.nn.Module.
@@ -350,7 +378,6 @@ class VAE(_nn.Module):
         data_loader: _DataLoader,
         epoch: int,
         optimizer,
-        batchsteps: list[int],
         hparams,
         logfile,
         awl = None,
@@ -672,8 +699,8 @@ class VAE(_nn.Module):
             '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
             aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
             augmentation_count_number = [0, 0]
-            augmentation_count_number[0] = len(glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*')) if hparams.augmode[0] == -1 else len(_glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*_{aug_all_method[hparams.augmode[0]]}_*'))
-            augmentation_count_number[1] = len(glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*')) if hparams.augmode[0] == -1 else len(_glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*_{aug_all_method[hparams.augmode[1]]}_*'))
+            augmentation_count_number[0] = len(glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+_os.sep}pool0*k{self.k}*_{aug_all_method[hparams.augmode[0]]}_*'))
+            augmentation_count_number[1] = len(glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*')) if hparams.augmode[0] == -1 else len(glob(rf'{augmentationpath+_os.sep}pool1*k{self.k}*_{aug_all_method[hparams.augmode[1]]}_*'))
 
             if augmentation_count_number[0] > math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
                 warnings.warn('Too many augmented data, augmented data might not be trained enough. CLMB do not know how this influence the performance', FutureWarning)
@@ -723,7 +750,7 @@ class VAE(_nn.Module):
                     aug_tensor1, aug_tensor2 = _torch.from_numpy(aug_arr1), _torch.from_numpy(aug_arr2)
                     # print('augtensor', _torch.sum(aug_tensor1 ** 2), _torch.sum(aug_tensor2 ** 2), aug_archive1_file, aug_archive2_file, _np.sum(aug_arr1 ** 2), _np.sum(aug_arr2 ** 2))
                     # if aug_tensor1 == aug_tensor2, reloop
-                    shuffle_file1, shuffle_file2 = _aug_file_shuffle(augmentation_count_number, augmentationpath)
+                    shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath)
                     aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
                 # print('difference',_torch.sum(_torch.sub(aug_tensor1, aug_tensor2), axis=1), _torch.sum(_torch.sub(aug_tensor1, aug_tensor2)))
 
@@ -742,7 +769,7 @@ class VAE(_nn.Module):
                     data_loader = _DataLoader(dataset=_TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                                         batch_size=dataloader.batch_size if epoch == 0 else data_loader.batch_size,
                                         shuffle=True, drop_last=False, num_workers=dataloader.num_workers, pin_memory=dataloader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, batchsteps_set, logfile, hparams, awl)
+                self.trainepoch(data_loader, epoch, optimizer, logfile, hparams, awl)
 
         # vamb
         else:
@@ -761,7 +788,7 @@ class VAE(_nn.Module):
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, batchsteps_set, logfile, argparse.Namespace())
+                self.trainepoch(data_loader, epoch, optimizer, logfile, argparse.Namespace())
 
         # Save weights - Lord forgive me, for I have sinned when catching all exceptions
         if modelfile is not None:
