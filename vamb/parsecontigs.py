@@ -13,6 +13,7 @@ from collections.abc import Iterable, Sequence
 from typing import IO, Union, TypeVar
 import math
 import random
+import time
 
 # This kernel is created in src/create_kernel.py. See that file for explanation
 _KERNEL: _np.ndarray = _vambtools.read_npz(
@@ -258,6 +259,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
 
         lengths = _vambtools.PushArray(_np.int)
         contignames = list()
+        mask = bytearray()
         '''
         # We do not generate the iteration number due to time cost. We just find the minimum augmentation we need for all iteration (backup_iteration)
         # Create backup augmentation pools
@@ -323,7 +325,10 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                 entries = _vambtools.byte_iterfasta(filehandle)
 
                 for entry in entries:
-                    if len(entry) < minlength:
+                    skip = len(entry) < minlength
+                    mask.append(not skip)
+
+                    if skip:
                         continue
 
                     t = entry.kmercounts(k)
@@ -405,7 +410,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                 for j2 in range(gaussian_count[i]):
                     gaussian_save = gaussian_arr[:,j2,:]
                     gaussian_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", _convert_and_project_mat(gaussian_save, _KERNEL_PROJ, k))
+                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", Composition._convert_and_project_mat(gaussian_save, _KERNEL_PROJ, k))
                     index += 1
 
                     '''for pc-mer, instead of saving _convert_and... save just gaussian_save'''
@@ -413,19 +418,19 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
                     trans_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", _convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
+                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", Composition._convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
                     index += 1
 
                 for j2 in range(traver_count[i]):
                     traver_save = traver_arr[:,j2,:]
                     traver_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", _convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
+                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
                     index += 1
 
                 for j2 in range(mutated_count[i]):
                     mutated_save = mutated_arr[:,j2,:]
                     mutated_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", _convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
+                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", Composition._convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
                     index += 1
 
                 gaussian.clear()
@@ -439,7 +444,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
         norm_arr = norm.take()
         norm_arr.shape = (-1, 4**k)
 
-        norm_arr = _convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
+        norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
 
         '''norm_arr = pcmer.take()'''   #to take pcmer instead of tnfs
 
