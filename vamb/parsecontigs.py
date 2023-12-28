@@ -14,6 +14,7 @@ from typing import IO, Union, TypeVar
 import math
 import random
 import time
+from vamb._vambtools import _kmercounts, _pmercounts, 
 
 # This kernel is created in src/create_kernel.py. See that file for explanation
 _KERNEL: _np.ndarray = _vambtools.read_npz(
