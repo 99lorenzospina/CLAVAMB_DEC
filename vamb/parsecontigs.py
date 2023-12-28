@@ -8,8 +8,11 @@ Usage:
 import os as _os
 import numpy as _np
 import vamb.vambtools as _vambtools
+import vamb.mimics as mimics
 from collections.abc import Iterable, Sequence
 from typing import IO, Union, TypeVar
+import math
+import random
 
 # This kernel is created in src/create_kernel.py. See that file for explanation
 _KERNEL: _np.ndarray = _vambtools.read_npz(
@@ -140,17 +143,17 @@ class Composition:
         _vambtools.numpy_inplace_maskarray(self.matrix, mask)
 
     @staticmethod
-    def _project(fourmers: np.ndarray, kernel: np.ndarray = _KERNEL) -> np.ndarray:
+    def _project(fourmers:_np.ndarray, kernel:_np.ndarray = _KERNEL) ->_np.ndarray:
         "Project fourmers down in dimensionality"
         s = fourmers.sum(axis=1).reshape(-1, 1) #sum the content of each row, encolumn the results, the number of rows is the same as before
         s[s == 0] = 1.0
         fourmers *= 1 / s
         fourmers += -(1 / 256)
-        return np.dot(fourmers, kernel)
+        return _np.dot(fourmers, kernel)
 
     @staticmethod
-    def _convert(raw: PushArray, projected: PushArray): #change this in order to move from TNF to new representation
-        "Move data from raw PushArray to projected PushArray, converting it."
+    def _convert(raw: _vambtools.PushArray, projected: _vambtools.PushArray): #change this in order to move from TNF to new representation
+        "Move data from raw _vambtools.PushArray to projected _vambtools.PushArray, converting it."
         raw_mat = raw.take().reshape(-1, 256) #I impose only 256 colmumns, so every row is a single kmer-vector
         projected_mat = Composition._project(raw_mat)
         projected.extend(projected_mat.ravel())
@@ -162,7 +165,7 @@ class Composition:
       s[s == 0] = 1.0
       raw_mat *= 1/s
       raw_mat += -(1/(4**k))  #raw_mat is still with 256 columns
-      return np.dot(raw_mat, kernel)  #dimensions: "-1"x103, every row is a kmer encoded
+      return _np.dot(raw_mat, kernel)  #dimensions: "-1"x103, every row is a kmer encoded
 
     @classmethod
     def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100) -> C:
@@ -176,14 +179,14 @@ class Composition:
         if minlength < 4:
             raise ValueError(f"Minlength must be at least 4, not {minlength}")
 
-        raw = PushArray(np.float32)
-        pc = PushArray(np.float32)
-        projected = PushArray(np.float32)
-        lengths = PushArray(np.int32)
+        raw = _vambtools.PushArray(_np.float32)
+        pc = _vambtools.PushArray(_np.float32)
+        projected = _vambtools.PushArray(_np.float32)
+        lengths = _vambtools.PushArray(_np.int32)
         mask = bytearray()  # we convert to Numpy at end
         contignames: list[str] = list()
 
-        entries = byte_iterfasta(filehandle)
+        entries = _vambtools.byte_iterfasta(filehandle)
 
         for entry in entries: #entry is a single contig taken by the FASTA file
             skip = len(entry) < minlength
@@ -215,15 +218,15 @@ class Composition:
         '''tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer'''
 
         metadata = CompositionMetaData(
-            np.array(contignames, dtype=object),
+           _np.array(contignames, dtype=object),
             lengths_arr,
-            np.array(mask, dtype=bool),
+           _np.array(mask, dtype=bool),
             minlength,
         )
         return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
 
 @classmethod
-    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
+def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
         """Parses a FASTA file open in binary reading mode.
 
         Input:
@@ -246,14 +249,14 @@ class Composition:
         if minlength < 4:
             raise ValueError('Minlength must be at least 4, not {}'.format(minlength))
 
-        norm = PushArray(np.float32)
-        pc = PushArray(np.float32)
-        gaussian = PushArray(np.float32)
-        trans = PushArray(np.float32)
-        traver = PushArray(np.float32)
-        mutated = PushArray(np.float32)
+        norm = _vambtools.PushArray(_np.float32)
+        pc = _vambtools.PushArray(_np.float32)
+        gaussian = _vambtools.PushArray(_np.float32)
+        trans = _vambtools.PushArray(_np.float32)
+        traver = _vambtools.PushArray(_np.float32)
+        mutated = _vambtools.PushArray(_np.float32)
 
-        lengths = PushArray(np.int)
+        lengths = _vambtools.PushArray(_np.int)
         contignames = list()
         '''
         # We do not generate the iteration number due to time cost. We just find the minimum augmentation we need for all iteration (backup_iteration)
@@ -264,12 +267,12 @@ class Composition:
         # aug_all_method = ['AllAugmentation','GaussianNoise','Transition','Transversion','Mutation']
 
         # Create projection kernel
-        _KERNEL_PROJ = read_npz(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        _KERNEL_PROJ = _vambtools.read_npz(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                                   f"kernel/kernel{k}.npz"))
 
         # Count the number of entries
         filehandle.filehandle.seek(0, 0)
-        entry_count = vamb.vambtools.count_entry(filehandle)
+        entry_count = _vambtools.count_entry(filehandle)
         print(f'{entry_count} sequences are used for this binning')
 
         '''If the number of sequences is too large, we might decrease the number of generated augmentation to avoid CLMB being killed.'''
@@ -317,7 +320,7 @@ class Composition:
 
                 '''Reset the file and generator for next reading'''
                 filehandle.filehandle.seek(0, 0)
-                entries = vamb.vambtools.byte_iterfasta(filehandle)
+                entries = _vambtools.byte_iterfasta(filehandle)
 
                 for entry in entries:
                     if len(entry) < minlength:
@@ -334,14 +337,14 @@ class Composition:
                         pc.extend(q)
 
                     for j in range(gaussian_count[i]):
-                        t_gaussian = vamb.mimics.add_noise(t)
+                        t_gaussian = mimics.add_noise(t)
                         gaussian.extend(t_gaussian)
                         '''gaussian.extend(add_noise(q))'''
                         # print('gaussian',_np.sum(t_gaussian-t_norm))
 
                     # mutations = mimics.transition(entry.sequence, 1 - 0.021, trans_count[i])
                     if trans_count[i] != 0:
-                        mutations = vamb.mimics.transition(entry.sequence, 1 - 0.065, trans_count[i])
+                        mutations = mimics.transition(entry.sequence, 1 - 0.065, trans_count[i])
                     for j in range(trans_count[i]):
                         '''
                         As the function _kmercounts changes the input array at storage, we should reset counts_kmer's storage when using it.
@@ -359,9 +362,9 @@ class Composition:
 
                     # mutations = mimics.transversion(entry.sequence, 1 - 0.0105, traver_count[i])
                     if traver_count[i] != 0:
-                        mutations = vamb.mimics.transversion(entry.sequence, 1 - 0.003, traver_count[i])
+                        mutations = mimics.transversion(entry.sequence, 1 - 0.003, traver_count[i])
                     for j in range(traver_count[i]):
-                        counts_kmer = np.zeros(1 << (2*k), dtype=_np.int32)
+                        counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                         _kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_traver = counts_kmer / _np.sum(counts_kmer)
@@ -371,9 +374,9 @@ class Composition:
 
                     # mutations = mimics.transition_transversion(entry.sequence, 1 - 0.014, 1 - 0.007, mutated_count[i])
                     if mutated_count[i] != 0:
-                        mutations = vamb.mimics.transition_transversion(entry.sequence, 1 - 0.065, 1 - 0.003, mutated_count[i])
+                        mutations = mimics.transition_transversion(entry.sequence, 1 - 0.065, 1 - 0.003, mutated_count[i])
                     for j in range(mutated_count[i]):
-                        counts_kmer = np.zeros(1 << (2*k), dtype=_np.int32)
+                        counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                         _kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_mutated = counts_kmer / _np.sum(counts_kmer)
@@ -441,9 +444,9 @@ class Composition:
         '''norm_arr = pcmer.take()'''   #to take pcmer instead of tnfs
 
         metadata = CompositionMetaData(
-            np.array(contignames, dtype=object),
+           _np.array(contignames, dtype=object),
             lengths_arr,
-            np.array(mask, dtype=bool),
+           _np.array(mask, dtype=bool),
             minlength,
         )
         return cls(metadata, norm_arr)

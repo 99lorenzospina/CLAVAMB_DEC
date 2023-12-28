@@ -7,7 +7,7 @@ import bz2 as _bz2
 import lzma as _lzma
 import numpy as _np
 import re as _re
-from vamb._vambtools import _kmercounts, _overwrite_matrix
+from vamb._vambtools import _kmercounts, _overwrite_matrix, _pcmercounts    #cython!
 import collections as _collections
 from hashlib import md5 as _md5
 from collections.abc import Iterable, Iterator, Generator
