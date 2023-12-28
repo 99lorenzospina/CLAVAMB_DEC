@@ -12,6 +12,7 @@ from glob import glob
 import math
 import warnings
 import random
+import os as _os
 
 __doc__ = """Encode a depths matrix and a tnf matrix to latent representation.
 
@@ -410,10 +411,10 @@ class VAE(_nn.Module):
                 loss.backward()
                 optimizer.step()
     
-                epoch_loss += loss.data.item()
-                epoch_kldloss += kld.data.item()
-                epoch_sseloss += sse.data.item()
-                epoch_celoss += ce.data.item()
+                epoch_loss += float(loss.item())
+                epoch_kldloss += float(lkld.item())
+                epoch_sseloss += float(lsse.item())
+                epoch_celoss += float(lce.item())
     
             if logfile is not None:
                 print(
@@ -476,10 +477,10 @@ class VAE(_nn.Module):
                 optimizer.step()
                 print('loss', loss-10000*loss1,loss1,loss_contrast1,loss_contrast2,loss_contrast3,file=logfile)
 
-                epoch_loss += loss.data.item()
-                epoch_kldloss += (kld1).data.item()
-                epoch_cesseloss += (ce1).data.item()
-                epoch_clloss += (sse1).data.item()
+                epoch_loss += float(lloss.item())
+                epoch_kldloss += float(l(kld1).item())
+                epoch_cesseloss += float(l(ce1).item())
+                epoch_clloss += float(l(sse1).item())
 
             #Gradient monitor using hook (require extra memory and time cost)
             #for i in range(len(grad_block)):

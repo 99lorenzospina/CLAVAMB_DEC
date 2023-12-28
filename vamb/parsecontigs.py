@@ -4,7 +4,9 @@ Usage:
 >>> with open('/path/to/contigs.fna') as filehandle
 ...     tnfs, contignames, lengths = read_contigs(filehandle)
 """
-
+import pyximport
+pyximport.install()
+import vamb._vambtools as v
 import os as _os
 import numpy as _np
 import vamb.vambtools as _vambtools
@@ -14,7 +16,6 @@ from typing import IO, Union, TypeVar
 import math
 import random
 import time
-from vamb._vambtools import _kmercounts, _pmercounts, 
 
 # This kernel is created in src/create_kernel.py. See that file for explanation
 _KERNEL: _np.ndarray = _vambtools.read_npz(
@@ -356,7 +357,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                         As the function _kmercounts changes the input array at storage, we should reset counts_kmer's storage when using it.
                         '''
                         counts_kmer = _np.zeros(1 << (2*k), dtype=_np.int32)
-                        _kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_trans = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_trans, - 1/(2*4**k), out=t_trans)
@@ -371,7 +372,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                         mutations = mimics.transversion(entry.sequence, 1 - 0.003, traver_count[i])
                     for j in range(traver_count[i]):
                         counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
-                        _kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_traver = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_traver, - 1/(2*4**k), out=t_traver)
@@ -383,7 +384,7 @@ def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, stor
                         mutations = mimics.transition_transversion(entry.sequence, 1 - 0.065, 1 - 0.003, mutated_count[i])
                     for j in range(mutated_count[i]):
                         counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
-                        _kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_mutated = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_mutated, - 1/(2*4**k), out=t_mutated)
