@@ -268,7 +268,7 @@ class FastaEntry:
         return counts
 
     def pcmercounts(self, k: int) -> _np.ndarray:
-        counts = np.zeros(3 * (1 <<  k), dtype=_np.int32)
+        counts = _np.zeros(3 * (1 <<  k), dtype=_np.int32)
         _pcmercounts(self.sequence, k, counts)
         return counts
 
@@ -671,7 +671,7 @@ def _load_jgi(filehandle, minlength, refhash):
         '"contigLen" and "totalAvgDepth"')
 
     columns = tuple([i for i in range(3, len(fields)) if not fields[i].endswith("-var")])
-    array = PushArray(np.float32)
+    array = PushArray(_np.float32)
     identifiers = list()
 
     for row in filehandle:
@@ -708,4 +708,4 @@ def _load_jgi(filehandle):
     Output:
         N_contigs x N_samples Numpy matrix of dtype float32
     """
-    return load_jgi(filehandle, 0, None)
+    return _load_jgi(filehandle, 0, None)

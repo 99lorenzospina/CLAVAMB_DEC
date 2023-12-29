@@ -412,9 +412,9 @@ class VAE(_nn.Module):
                 optimizer.step()
     
                 epoch_loss += float(loss.item())
-                epoch_kldloss += float(lkld.item())
-                epoch_sseloss += float(lsse.item())
-                epoch_celoss += float(lce.item())
+                epoch_kldloss += float(kld.item())
+                epoch_sseloss += float(sse.item())
+                epoch_celoss += float(ce.item())
     
             if logfile is not None:
                 print(
@@ -477,10 +477,10 @@ class VAE(_nn.Module):
                 optimizer.step()
                 print('loss', loss-10000*loss1,loss1,loss_contrast1,loss_contrast2,loss_contrast3,file=logfile)
 
-                epoch_loss += float(lloss.item())
-                epoch_kldloss += float(l(kld1).item())
-                epoch_cesseloss += float(l(ce1).item())
-                epoch_clloss += float(l(sse1).item())
+                epoch_loss += float(loss.item())
+                epoch_kldloss += float((kld1).item())
+                epoch_cesseloss += float((ce1).item())
+                epoch_clloss += float((sse1).item())
 
             #Gradient monitor using hook (require extra memory and time cost)
             #for i in range(len(grad_block)):
@@ -690,7 +690,7 @@ class VAE(_nn.Module):
         if self.contrast:
             '''Optimizer setting'''
             awl = AutomaticWeightedLoss(3)
-            optimizer = _torch.optim.Adam([{'params':self.parameters(), 'lr':lrate}, {'params': awl.parameters(), 'lr':0.111, 'weight_decay': 0, 'eps': 1e-7}])
+            optimizer = _Adam([{'params':self.parameters(), 'lr':lrate}, {'params': awl.parameters(), 'lr':0.111, 'weight_decay': 0, 'eps': 1e-7}])
             # for param in awl.parameters():
             #     print('awl',type(param), param.size())
             #Other optimizer options (not complemented)
@@ -774,7 +774,7 @@ class VAE(_nn.Module):
 
         # vamb
         else:
-            optimizer = _torch.optim.Adam(self.parameters(), lr=lrate)
+            optimizer = _Adam(self.parameters(), lr=lrate)
             data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
                                     shuffle=True,

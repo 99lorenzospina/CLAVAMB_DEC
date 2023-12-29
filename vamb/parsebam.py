@@ -220,6 +220,13 @@ def _check_bamfile(path, bamfile, refhash, minlength):
                     "unsorted or sorted by readname.")
         raise ValueError(errormsg.format(path, sort_order))
 
+def is_bam_sorted(bam_path):
+    try:
+        with _pysam.AlignmentFile(bam_path, 'rb') as bam_file:
+            # Verifica se il file BAM è ordinato rispetto al riferimento genetico
+            return bam_file.check_index() is not None
+    except ValueError:
+        return False
 
 def _get_contig_rpkms(inpath, outpath, refhash, minscore, minlength, minid):
     """Returns  RPKM (reads per kilobase per million mapped reads)

@@ -249,7 +249,6 @@ def trainaae(
     alpha: Optional[float],  # set automatically if None
     sl: float,
     slr: float,
-    temp: Optional[float],
     cuda: bool,
     batchsize: int,
     nepochs: int,
@@ -299,7 +298,7 @@ def trainaae(
             aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=True)
             aae.to(('cuda' if cuda else 'cpu'))
     else:
-        aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, srl=srl, cuda=cuda, contrast=False)
+        aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, contrast=False)
         log("Created AAE", logfile, 1)
         modelpath = os.path.join(outdir, 'aae_model.pt')
         aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
@@ -466,7 +465,6 @@ def run(
     dropout: Optional[float],
     sl: float,
     slr: float,
-    aae_temperature: float,
     lrate_vae: float,
     lrate_aae: float,
     batchsteps: list[int],
@@ -503,7 +501,7 @@ def run(
     
     
     # Parse BAMs, save as npz
-    refhash = None if norefcheck else vamb.vambtools._hash_refnames(contignames)
+    refhash = None if norefcheck else vamb.vambtools._hash_refnames(composition.metadata.identifiers)
     abundance = calc_rpkm(
         outdir,
         bampaths,
@@ -590,7 +588,6 @@ def run(
             alpha,
             sl,
             slr,
-            aae_temperature,
             cuda,
             batchsize_aae,
             nepochs_aae,
@@ -773,11 +770,11 @@ def main():
 
     # Contrastive learning arguments
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
-    contrastiveos.add_argument('--contrastive_vae', action='store_true', help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
-    contrastiveos.add_argument('--contrastive_aae', action='store_true', help='Whether to perform contrastive learning(CLAMB) or not(AAMB). [False]')
+    contrastiveos.add_argument('--contrastive_vae', action='store_true', default=False, help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
+    contrastiveos.add_argument('--contrastive_aae', action='store_true', default=False, help='Whether to perform contrastive learning(CLAMB) or not(AAMB). [False]')
     contrastiveos.add_argument('--augmode', metavar='', nargs = 2, type = int, default=[3, 3],
                         help='The augmentation method. Requires 2 int. specify -1 if trying all augmentation methods. Choices: 0 for gaussian noise, 1 for transition, 2 for transversion, 3 for mutation, -1 for all. [3, 3]')
-    contrastiveos.add_argument('--augdatashuffle', action='store_true',
+    contrastiveos.add_argument('--augdatashuffle', action='store_true', default=False,
             help='Whether to shuffle the training augmentation data (True: For each training, random select the augmentation data from the augmentation dir pool.\n!!!BE CAUTIOUS WHEN TURNING ON [False])')
     contrastiveos.add_argument('--augmentation', metavar='', help='path to augmentation dir. [outdir/augmentation]')
     contrastiveos.add_argument('--temperature', metavar='', default=1, type=float, help='The temperature for the normalized temperature-scaled cross entropy loss. [1]')
@@ -1138,7 +1135,7 @@ def main():
                 )
 
             # Check this early, since I expect users will forget about this
-            if not vamb.parsebam.pycoverm.is_bam_sorted(bampath):
+            if not vamb.parsebam.is_bam_sorted(bampath):
                 raise ValueError(f"BAM file {bampath} is not sorted by reference.")
 
     # Check minfasta settings
