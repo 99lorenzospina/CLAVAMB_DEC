@@ -98,7 +98,7 @@ def make_dataloader(
         mask &= depthssum != 0
         depthssum = depthssum[mask]
         assert isinstance(depthssum, _np.ndarray)
-
+    
     if mask.sum() < batchsize:
         raise ValueError(
             "Fewer sequences left after filtering than the batch size. " +
@@ -554,7 +554,9 @@ class VAE(_nn.Module):
         Output: None
         """
         state = {
+            "ntnf": self.ntnf,
             "nsamples": self.nsamples,
+            "k": self.k,
             "alpha": self.alpha,
             "beta": self.beta,
             "dropout": self.dropout,
@@ -583,15 +585,22 @@ class VAE(_nn.Module):
         # Forcably load to CPU even if model was saves as GPU model
         dictionary = _torch.load(path, map_location=lambda storage, loc: storage)
 
+        try:
+            ntnf = dictionary["ntnf"]
+        except KeyError:
+            ntnf = 103
         nsamples = dictionary["nsamples"]
+        try:
+            k = dictionary["k"]
+        except KeyError:
+            k = 4
         alpha = dictionary["alpha"]
         beta = dictionary["beta"]
         dropout = dictionary["dropout"]
         nhiddens = dictionary["nhiddens"]
         nlatent = dictionary["nlatent"]
         state = dictionary["state"]
-
-        vae = cls(nsamples, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
+        vae = cls(ntnf, nsamples, k, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
         vae.load_state_dict(state)
 
         if cuda:
@@ -662,7 +671,7 @@ class VAE(_nn.Module):
         # Get number of features
         # Following line is un-inferrable due to typing problems with DataLoader
         ncontigs, nsamples = dataloader.dataset.tensors[0].shape  # type: ignore
-        depthstensor, tnftensor = dataloader.dataset.tensors
+        depthstensor, tnftensor, _ = dataloader.dataset.tensors
 
         if logfile is not None:
             print("\tNetwork properties:", file=logfile)
@@ -756,7 +765,7 @@ class VAE(_nn.Module):
                 # print('difference',_torch.sum(_torch.sub(aug_tensor1, aug_tensor2), axis=1), _torch.sum(_torch.sub(aug_tensor1, aug_tensor2)))
 
                 '''Double the batchsize and decrease the learning rate by 0.8 for each batchstep'''
-                if epoch in batchsteps:
+                if epoch in batchsteps_set:
                     for param_group in optimizer.param_groups:
                         param_group['lr'] *= hparams.lrate_decent
                         #if param_group['eps']==1e-7:
@@ -770,7 +779,7 @@ class VAE(_nn.Module):
                     data_loader = _DataLoader(dataset=_TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                                         batch_size=dataloader.batch_size if epoch == 0 else data_loader.batch_size,
                                         shuffle=True, drop_last=False, num_workers=dataloader.num_workers, pin_memory=dataloader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, logfile, hparams, awl)
+                self.trainepoch(data_loader, epoch, optimizer, hparams, logfile, awl)
 
         # vamb
         else:
@@ -782,14 +791,14 @@ class VAE(_nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
             for epoch in range(nepochs):
-                if epoch in batchsteps:
+                if epoch in batchsteps_set:
                     data_loader = _DataLoader(dataset=data_loader.dataset,
                                         batch_size=data_loader.batch_size * 2,
                                         shuffle=True,
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, logfile, argparse.Namespace())
+                self.trainepoch(data_loader, epoch, optimizer, argparse.Namespace(), logfile)
 
         # Save weights - Lord forgive me, for I have sinned when catching all exceptions
         if modelfile is not None:

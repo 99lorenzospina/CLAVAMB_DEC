@@ -42,6 +42,7 @@ class AAE(nn.Module):
         slr: float,
         alpha: Optional[float],
         _cuda: bool,
+        k: int = 4,
         contrast: bool = False,
     ):
         if nsamples is None:
@@ -55,6 +56,7 @@ class AAE(nn.Module):
 
         self.nsamples = nsamples
         self.ntnf = ntnf
+        self.k = k
         self.h_n = nhiddens
         self.ld = nlatent_l
         self.y_len = nlatent_y
@@ -185,7 +187,10 @@ class AAE(nn.Module):
       # Forcably load to CPU even if model was saves as GPU model
       # dictionary = torch.load(path, map_location=lambda storage, loc: storage)
       dictionary = torch.load(path)
-      ntnf = dictionary['ntnf']
+      try:
+            ntnf = dictionary["ntnf"]
+      except KeyError:
+            ntnf = 103
       nsamples = dictionary['nsamples']
       alpha = dictionary['alpha']
       nhiddens = dictionary['nhiddens']
@@ -193,9 +198,13 @@ class AAE(nn.Module):
       nlatent_y = dictionary['nlatent_y']
       sl = dictionary['sl']
       slr = dictionary['slr']
+      try:
+            k = dictionary["k"]
+      except KeyError:
+            k = 4
       state = dictionary['state']
 
-      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, c=c)
+      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, k=k, c=c)
       aae.load_state_dict(state)
 
       if cuda:
@@ -220,6 +229,7 @@ class AAE(nn.Module):
                  'nlatent_y': self.y_len,
                  'sl' : self.sl,
                  'slr': self.slr,
+                 'k' : self.k,
                  'state': self.state_dict(),
                 }
 
@@ -707,7 +717,7 @@ class AAE(nn.Module):
                   shuffle_file1, shuffle_file2 = aug_file_shuffle(augmentation_count_number, augmentationpath)
                   aug_archive1_file, aug_archive2_file = aug_archive1_file if shuffle_file1 is None else shuffle_file1, aug_archive2_file if shuffle_file2 is None else shuffle_file2
                 
-              if epoch_i in batchsteps:
+              if epoch_i in batchsteps_set:
                   data_loader = _DataLoader(
                       dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size * 2,
@@ -720,7 +730,7 @@ class AAE(nn.Module):
                   data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
                       shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
-              self.trainepoch(epoch, data_loader, batchsteps_set, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
+              self.trainepoch(epoch, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
         
         #Non contrastive learning
         else:
@@ -731,14 +741,14 @@ class AAE(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
             for epoch in range(nepochs):
-                if epoch in batchsteps:
+                if epoch in batchsteps_set:
                     data_loader = _DataLoader(dataset=data_loader.dataset,
                                         batch_size=data_loader.batch_size * 2,
                                         shuffle=True,
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(epoch, data_loader, batchsteps_set, logfile, _Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss)
+                self.trainepoch(epoch, data_loader, logfile, _Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss)
             
 
     ########### function that retrieves the clusters from Y latents

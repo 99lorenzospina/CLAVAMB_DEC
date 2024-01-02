@@ -206,7 +206,7 @@ class Composition:
             lengths.append(len(entry))
             contignames.append(entry.header)
 
-            pc.extend(entry.pmercounts(2))
+            pc.extend(entry.pcmercounts(2))
 
         # Convert rest of contigs
         Composition._convert(raw, projected)
@@ -228,8 +228,8 @@ class Composition:
         )
         return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
 
-@classmethod
-def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
+    @classmethod
+    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
         """Parses a FASTA file open in binary reading mode.
 
         Input:
