@@ -146,8 +146,5 @@ with vamb.vambtools.Reader(bigpath) as f:
 with open(fasta_path, 'rb') as file:
     temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=100, store_dir="./data/")
     tnf = temp.matrix
-    print(tnf)
-    print(tnf.shape[0])
-    print(tnf.shape[1])
     contignames = temp.metadata.identifiers
     contiglengths = temp.metadata.lengths

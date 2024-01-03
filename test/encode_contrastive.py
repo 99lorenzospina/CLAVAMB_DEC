@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 import torch
+from argparse import Namespace
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
@@ -68,17 +69,35 @@ assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 vae = vamb.encode.VAE(103, nsamples=3, c=True)
 
 # Training model works in general
-tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
-rpkm = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_rpkm.npz'))
+
+with open(os.path.join(parentdir, 'test', 'data', 'fasta.fna'), 'rb') as file:
+    temp = vamb.parsecontigs.Composition.from_file(file, minlength=100)
+    tnf = temp.matrix
+    contignames = temp.metadata.identifiers
+    contiglengths = temp.metadata.lengths
+rpkm = np.ones((tnf.shape[0],3), dtype=np.float32)
 lengths = np.ones(tnf.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
-dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
-vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
-vae.trainmodel(dataloader, batchsteps=None, nepochs=15)
+dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=2)
+
+
+hparams = Namespace(
+        validation_size=4096,   # Debug only. Validation size for training.
+        visualize_size=25600,   # Debug only. Visualization (pca) size for training.
+        temperature=1,        # The parameter for contrastive loss
+        augmode=[-1, -1],        # Augmentation method choices (in aug_all_method)
+        sigma = 4000,           # Add weight on the contrastive loss to avoid gradient disappearance
+        lrate_decent = 0.8,     # Decrease the learning rate by lrate_decent for each batchstep
+        augdatashuffle = False     # Shuffle the augmented data for training to introduce more noise. Setting True is not recommended. [False]
+    )
+
+vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15, hparams=hparams, augmentationpath="./data/", mask=mask)
+vae.trainmodel(dataloader, batchsteps=None, nepochs=15, hparams=hparams, augmentationpath="./data/", mask=mask)
+
 
 # Training model fails with weird batch steps
 try:
-    vae.trainmodel(dataloader, batchsteps=[5, 10, 15, 20], nepochs=25)
+    vae.trainmodel(dataloader, batchsteps=[5, 10, 15, 20], nepochs=25, hparams=hparams, augmentationpath="./data/", mask=mask)
 except ValueError as e:
     assert 'Last batch size of' in str(e)
     pass
@@ -86,7 +105,7 @@ else:
     raise AssertionError('Should have raised ArgumentError when having too high batch size')
 
 try:
-    vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10)
+    vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10, hparams=hparams, augmentationpath="./data/", mask=mask)
 except ValueError as e:
     assert e.args == ('Max batchsteps must not equal or exceed nepochs',)
 else:

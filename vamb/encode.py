@@ -3,6 +3,7 @@ import vamb.vambtools as _vambtools
 from torch.utils.data.dataset import TensorDataset as _TensorDataset
 from torch.utils.data import DataLoader as _DataLoader
 from torch.nn.functional import softmax as _softmax
+import torch.nn.functional as _F
 from torch.optim import Adam as _Adam
 from torch import Tensor
 from torch import nn as _nn
@@ -165,7 +166,7 @@ class AutomaticWeightedLoss(_nn.Module):
         for i, loss in enumerate(x):
             #print(self.params[i].retain_grad(), self.params[i])
             loss_sum += 0.5 / (self.params[i] ** 2) * loss + _torch.log(1 + self.params[i] ** 2)
-        print('loss_sum',loss_sum)
+        #print('loss_sum',loss_sum.item())
         return loss_sum
 
 class VAE(_nn.Module):
@@ -353,7 +354,7 @@ class VAE(_nn.Module):
         tnf_out: Tensor,
         mu: Tensor,
         logsigma: Tensor,
-        weights: Tensor,
+        weights: Tensor = None,
     ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         # If multiple samples, use cross entropy, else use SSE for abundance
         if self.nsamples > 1:
@@ -370,9 +371,56 @@ class VAE(_nn.Module):
         kld_weight = 1 / (self.nlatent * self.beta)
         reconstruction_loss = ce * ce_weight + sse * sse_weight
         kld_loss = kld * kld_weight
-        loss = (reconstruction_loss + kld_loss) * weights
+        loss = (reconstruction_loss + kld_loss)
+        if weights!= None:
+            loss *= weights
 
         return loss.mean(), ce.mean(), sse.mean(), kld.mean()
+
+    def nt_xent_loss(self, out_1, out_2, temperature=2, eps=1e-6):
+        """
+            assume out_1 and out_2 are normalized
+            out_1: [batch_size, dim]
+            out_2: [batch_size, dim]
+        """
+        # gather representations in case of distributed training
+        # out_1_dist: [batch_size * world_size, dim]
+        # out_2_dist: [batch_size * world_size, dim]
+        out_1 = _F.normalize(out_1, dim=1)
+        out_2 = _F.normalize(out_2, dim=1)
+
+        out_1_dist = out_1
+        out_2_dist = out_2
+
+        # out: [2 * batch_size, dim]
+        # out_dist: [2 * batch_size * world_size, dim]
+        out = _torch.cat([out_1, out_2], dim=0)
+        out_dist = _torch.cat([out_1_dist, out_2_dist], dim=0)
+
+        # sum by dim, we set dim=1 since our data are sequences
+        # [2 * batch_size, 2 * batch_size * world_size] or 1
+        # L2_norm = _torch.mm(_torch.sum(_torch.pow(out,2),dim=1,keepdim=True), _torch.sum(_torch.pow(out_dist.t().contiguous(),2),dim=0,keepdim=True))
+        # L2_norm = _torch.clamp(L2_norm, min=eps)
+        L2_norm = 1.
+
+        # cov and sim: [2 * batch_size, 2 * batch_size * world_size]
+        # neg: [2 * batch_size]
+        cov = _torch.div(_torch.mm(out, out_dist.t().contiguous()), L2_norm)
+        sim = _torch.exp(cov / temperature)
+        neg = sim.sum(dim=-1)
+
+        # from each row, subtract e^1 to remove similarity measure for x1.x1
+        row_sub = _torch.Tensor(neg.shape).fill_(math.e).to(neg.device)
+        neg = _torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+
+        # Positive similarity, pos becomes [2 * batch_size]
+        pos = _torch.exp(_torch.sum(out_1 * out_2, dim=-1) / temperature)
+        pos = _torch.cat([pos, pos], dim=0)
+
+        loss = -_torch.log(pos / (neg + eps)).mean()
+        #print('out',out,cov,sim,neg,row_sub,pos)
+
+        return loss
 
     def trainepoch(
         self,
@@ -475,7 +523,7 @@ class VAE(_nn.Module):
                 loss.backward()
 
                 optimizer.step()
-                print('loss', loss-10000*loss1,loss1,loss_contrast1,loss_contrast2,loss_contrast3,file=logfile)
+                #print('loss', (loss-10000*loss1).item(),loss1.item(),loss_contrast1.item(),loss_contrast2.item(),loss_contrast3.item(),file=logfile)
 
                 epoch_loss += float(loss.item())
                 epoch_kldloss += float((kld1).item())
@@ -716,7 +764,7 @@ class VAE(_nn.Module):
                 warnings.warn('Too many augmented data, augmented data might not be trained enough. CLMB do not know how this influence the performance', FutureWarning)
             elif augmentation_count_number[0] < math.ceil(math.sqrt(nepochs)) or augmentation_count_number[1] > math.ceil(math.sqrt(nepochs)):
                 raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run VAMB')
-
+                pass
             '''Function for shuffling the augmented data (if needed)'''
             def aug_file_shuffle(_count, _augmentationpath, _augdatashuffle=False):
                 _shuffle_file1 = random.randrange(0, sum(_count) - 1)
@@ -749,7 +797,9 @@ class VAE(_nn.Module):
 
                 '''Avoid training 2 same augmentation data'''
                 aug_tensor1, aug_tensor2 = 0, 0
+                print("epoca: ", epoch)
                 while(_torch.sum(_torch.sub(aug_tensor1, aug_tensor2))==0):
+                    print(aug_archive1_file[0], " and ", aug_archive2_file[0])
                     aug_arr1, aug_arr2 = _vambtools.read_npz(aug_archive1_file[0]), _vambtools.read_npz(aug_archive2_file[0])
                     '''Mutate rpkm and tnf array in-place instead of making a copy.'''
                     aug_arr1 = _vambtools.numpy_inplace_maskarray(aug_arr1, mask)

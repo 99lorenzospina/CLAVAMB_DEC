@@ -73,6 +73,12 @@ rpkm = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_r
 lengths = np.ones(tnf.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
+
+print(rpkm.shape[0])
+print(rpkm.shape[1])
+print(tnf.shape[0])
+print(tnf.shape[1])
+
 vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
 vae.trainmodel(dataloader, batchsteps=None, nepochs=15)
 

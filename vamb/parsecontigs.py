@@ -328,7 +328,8 @@ class Composition:
 
                 for entry in entries:
                     skip = len(entry) < minlength
-                    mask.append(not skip)
+                    if i == 0 and i2 == 0:
+                        mask.append(not skip)
 
                     if skip:
                         continue
