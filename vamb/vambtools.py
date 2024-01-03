@@ -332,6 +332,45 @@ def byte_iterfasta(
 
     yield FastaEntry(header, bytearray().join(buffer))
 
+def count_entry(filehandle, comment=b'#') -> int:
+    """Count the number of entries in a binary opened fasta file.
+
+    Inputs:
+        filehandle: Any iterator of binary lines of a FASTA file
+        comment: Ignore lines beginning with any whitespace + comment
+
+    Output: Number of entries in file
+    """
+
+    # Make it work for persistent iterators, e.g. lists
+    line_iterator = iter(filehandle)
+    # Skip to first header
+    try:
+        for probeline in line_iterator:
+            stripped = probeline.lstrip()
+            if stripped.startswith(comment):
+                pass
+
+            elif probeline[0:1] == b'>':
+                break
+
+            else:
+                raise ValueError('First non-comment line is not a Fasta header')
+
+        else: # no break Caution!! Represent for that for block has no breaks, don't use it causally
+            raise ValueError('Empty or outcommented file')
+
+    except TypeError:
+        errormsg = 'First line does not contain bytes. Are you reading file in binary mode?'
+        raise TypeError(errormsg) from None
+
+    num_entry = 1
+    # Iterate over lines and count entries one by one
+    for line in line_iterator:
+        if line.startswith(b'>'):
+            num_entry += 1
+
+    return num_entry
 
 def write_clusters(
     filehandle: IO[str],

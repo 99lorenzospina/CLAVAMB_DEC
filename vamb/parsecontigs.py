@@ -259,7 +259,7 @@ class Composition:
         traver = _vambtools.PushArray(_np.float32)
         mutated = _vambtools.PushArray(_np.float32)
 
-        lengths = _vambtools.PushArray(_np.int)
+        lengths = _vambtools.PushArray(_np.int32)
         contignames = list()
         mask = bytearray()
         '''
@@ -275,7 +275,7 @@ class Composition:
                                   f"kernel/kernel{k}.npz"))
 
         # Count the number of entries
-        filehandle.filehandle.seek(0, 0)
+        filehandle.seek(0, 0)
         entry_count = _vambtools.count_entry(filehandle)
         print(f'{entry_count} sequences are used for this binning')
 
@@ -323,7 +323,7 @@ class Composition:
                         gaussian_count[i], trans_count[i], traver_count[i], mutated_count[i] = 0, 0, 0, backup_iteration_3
 
                 '''Reset the file and generator for next reading'''
-                filehandle.filehandle.seek(0, 0)
+                filehandle.seek(0, 0)
                 entries = _vambtools.byte_iterfasta(filehandle)
 
                 for entry in entries:
@@ -440,7 +440,7 @@ class Composition:
                 traver.clear()
                 mutated.clear()
 
-                print(time(), backup_iteration, backup_iteration_2, backup_iteration_3)
+                print(time.time(), backup_iteration, backup_iteration_2, backup_iteration_3)
 
         lengths_arr = lengths.take()
         norm_arr = norm.take()
