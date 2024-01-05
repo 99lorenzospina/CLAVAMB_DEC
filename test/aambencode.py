@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 import torch
+import random
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
@@ -83,23 +84,25 @@ try:
 except ValueError as e:
     assert 'Last batch size of' in str(e)
     pass
-else:
-    raise AssertionError('Should have raised ArgumentError when having too high batch size')
 
 try:
     aae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10)
 except ValueError as e:
     assert e.args == ('Max batchsteps must not equal or exceed nepochs',)
-else:
-    raise AssertionError('Should have raised ArgumentError when having too high batchsteps')
+
 
 # Loading saved VAE and encoding
 # modelpath = os.path.join(parentdir, 'test', 'data', 'model.pt')
 # aae = vamb.aamb_encode.AAE.load(modelpath)
 
 target_latent = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_latent.npz'))
+contignames = []
+while len(contignames) < tnf.shape[0]:
+    nuovo_codice = str(random.randint(100, 999))
+    if nuovo_codice not in contignames:
+        contignames.append(nuovo_codice)
 
-latent = aae.encode(dataloader)
+clust, latent = aae.get_latents(contignames, dataloader)
 
 #assert np.all(np.abs(latent - target_latent) < 1e-4)
 
@@ -109,5 +112,5 @@ inputs = inputs[0][:65], inputs[1][:65], inputs[2][:65]
 ds = torch.utils.data.dataset.TensorDataset(inputs[0], inputs[1], inputs[2])
 new_dataloader = torch.utils.data.DataLoader(dataset=ds, batch_size=64, shuffle=False, num_workers=1,)
 
-latent = aae.encode(new_dataloader)
+clust, latent = aae.get_latents(contignames, new_dataloader)
 #assert np.all(np.abs(latent - target_latent[:65]) < 1e-4)

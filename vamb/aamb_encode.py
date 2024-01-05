@@ -14,6 +14,7 @@ import math as _math
 from glob import glob
 import warnings
 import random
+import os
 
 from torch.utils.data import DataLoader as _DataLoader
 from argparse import Namespace as _Namespace
@@ -712,7 +713,7 @@ class AAE(nn.Module):
                           else glob(rf'{augmentationpath+os.sep}pool0*k{self.k}_*index{_shuffle_file1 % _count[0]}_{aug_all_method[hparams.augmode[0]]}_*')
               _shuffle_file2 = random.randrange(0, sum(_count) - 1)
               if _augdatashuffle:
-                  _aug_archive2_file = None if _shuffle_file2 < _count[1] else (glob(rf'{_augmentationpath+_os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
+                  _aug_archive2_file = None if _shuffle_file2 < _count[1] else (glob(rf'{_augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
                           else glob(rf'{augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_{aug_all_method[hparams.augmode[1]]}_*'))
               else:
                   _aug_archive2_file = glob(rf'{_augmentationpath+os.sep}pool1*k{self.k}_*index{_shuffle_file2 % _count[1]}_*') if hparams.augmode[1] == -1 \
@@ -845,7 +846,7 @@ class AAE(nn.Module):
 
                 if last_epoch:
                     mu, _, _, _, _, y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[
-                        0:5
+                        0:6
                     ]
                 else:
                     y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[5]
@@ -891,8 +892,8 @@ class AAE(nn.Module):
         # gather representations in case of distributed training
         # out_1_dist: [batch_size * world_size, dim]
         # out_2_dist: [batch_size * world_size, dim]
-        out_1 = _F.normalize(out_1, dim=1)
-        out_2 = _F.normalize(out_2, dim=1)
+        out_1 = F.normalize(out_1, dim=1)
+        out_2 = F.normalize(out_2, dim=1)
 
         out_1_dist = out_1
         out_2_dist = out_2
