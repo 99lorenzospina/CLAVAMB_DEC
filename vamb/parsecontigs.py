@@ -220,6 +220,7 @@ class Composition:
 
         if use_pc:
             tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer
+            tnfs_arr.shape = (len(lengths_arr), len(tnfs_arr) // len(lengths_arr))
 
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),

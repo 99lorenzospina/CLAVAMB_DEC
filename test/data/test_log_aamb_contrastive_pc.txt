@@ -1,0 +1,33 @@
+	Network properties:
+	CUDA: False
+	Alpha: 0.15
+	Y length: 100
+	Z length: 32
+
+	Training properties:
+	N epochs: 15
+	Starting batch size: 2
+	Batchsteps: 5, 10
+	N sequences: 4
+	N samples: 3
+
+	Epoch: 1	 Loss: 8093.665039	 Loss Enc/Dec: 0.490714	 Rec. loss: 0.4920	 CE: 0.5702	SSE: 32.5438	 Dz loss: 0.3533496	 Dy loss: 0.347023	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 1	 Loss: 15403.801270	 Loss Enc/Dec: 0.952361	 Rec. loss: 0.9549	 CE: 1.1259	SSE: 53.5904	 Dz loss: 0.7016326	 Dy loss: 0.691445	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 2	 Loss: 7418.246094	 Loss Enc/Dec: 0.475004	 Rec. loss: 0.4759	 CE: 0.5625	SSE: 26.0611	 Dz loss: 0.3389658	 Dy loss: 0.343723	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 2	 Loss: 14859.629395	 Loss Enc/Dec: 0.950961	 Rec. loss: 0.9529	 CE: 1.1197	SSE: 55.4006	 Dz loss: 0.6804785	 Dy loss: 0.687994	 Batchsize: 2	 Epoch time(min):  0.003
+	Epoch: 3	 Loss: 7353.807129	 Loss Enc/Dec: 0.456641	 Rec. loss: 0.4578	 CE: 0.5554	SSE: 17.9620	 Dz loss: 0.3505626	 Dy loss: 0.345949	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 3	 Loss: 14951.251465	 Loss Enc/Dec: 0.945345	 Rec. loss: 0.9477	 CE: 1.1200	SSE: 51.9555	 Dz loss: 0.6656143	 Dy loss: 0.683706	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 4	 Loss: 6755.441406	 Loss Enc/Dec: 0.473083	 Rec. loss: 0.4743	 CE: 0.5618	SSE: 25.3741	 Dz loss: 0.3286216	 Dy loss: 0.339238	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 4	 Loss: 13741.859375	 Loss Enc/Dec: 0.952553	 Rec. loss: 0.9547	 CE: 1.1170	SSE: 57.9158	 Dz loss: 0.6940014	 Dy loss: 0.678445	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 5	 Loss: 7935.433594	 Loss Enc/Dec: 0.480949	 Rec. loss: 0.4812	 CE: 0.5590	SSE: 31.2097	 Dz loss: 0.3165211	 Dy loss: 0.341522	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 5	 Loss: 15170.193359	 Loss Enc/Dec: 0.951749	 Rec. loss: 0.9528	 CE: 1.1182	SSE: 56.1148	 Dz loss: 0.6511837	 Dy loss: 0.665981	 Batchsize: 2	 Epoch time(min):  0.002
+	Epoch: 6	 Loss: 20194.470703	 Loss Enc/Dec: 0.958792	 Rec. loss: 0.9595	 CE: 1.1222	SSE: 58.3973	 Dz loss: 0.6314570	 Dy loss: 0.670044	 Batchsize: 4	 Epoch time(min):  0.002
+	Epoch: 7	 Loss: 18829.789062	 Loss Enc/Dec: 0.957199	 Rec. loss: 0.9574	 CE: 1.1269	SSE: 54.7178	 Dz loss: 0.6025132	 Dy loss: 0.665857	 Batchsize: 4	 Epoch time(min):  0.002
+	Epoch: 8	 Loss: 19109.386719	 Loss Enc/Dec: 0.986031	 Rec. loss: 0.9857	 CE: 1.1520	SSE: 60.4239	 Dz loss: 0.5626519	 Dy loss: 0.665701	 Batchsize: 4	 Epoch time(min):  0.002
+	Epoch: 9	 Loss: 20246.572266	 Loss Enc/Dec: 0.955158	 Rec. loss: 0.9562	 CE: 1.1237	SSE: 55.4993	 Dz loss: 0.6365002	 Dy loss: 0.655439	 Batchsize: 4	 Epoch time(min):  0.002
+	Epoch: 10	 Loss: 20610.400391	 Loss Enc/Dec: 0.971700	 Rec. loss: 0.9732	 CE: 1.1401	SSE: 58.3339	 Dz loss: 0.6158468	 Dy loss: 0.643868	 Batchsize: 4	 Epoch time(min):  0.001
+	Epoch: 11	 Loss: 19251.289062	 Loss Enc/Dec: 0.949419	 Rec. loss: 0.9506	 CE: 1.1185	SSE: 54.5142	 Dz loss: 0.6418423	 Dy loss: 0.642545	 Batchsize: 8	 Epoch time(min):  0.002
+	Epoch: 12	 Loss: 20938.490234	 Loss Enc/Dec: 0.980366	 Rec. loss: 0.9800	 CE: 1.1486	SSE: 58.4251	 Dz loss: 0.6231998	 Dy loss: 0.645771	 Batchsize: 8	 Epoch time(min):  0.002
+	Epoch: 13	 Loss: 19031.250000	 Loss Enc/Dec: 0.963339	 Rec. loss: 0.9618	 CE: 1.1400	SSE: 51.0398	 Dz loss: 0.4190729	 Dy loss: 0.628895	 Batchsize: 8	 Epoch time(min):  0.002
+	Epoch: 14	 Loss: 19053.445312	 Loss Enc/Dec: 0.974121	 Rec. loss: 0.9754	 CE: 1.1524	SSE: 53.6419	 Dz loss: 0.4571062	 Dy loss: 0.624923	 Batchsize: 8	 Epoch time(min):  0.002
+	Epoch: 15	 Loss: 19582.570312	 Loss Enc/Dec: 0.963328	 Rec. loss: 0.9628	 CE: 1.1464	SSE: 48.5024	 Dz loss: 0.5711802	 Dy loss: 0.596154	 Batchsize: 8	 Epoch time(min):  0.002

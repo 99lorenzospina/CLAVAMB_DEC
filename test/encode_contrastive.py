@@ -65,21 +65,21 @@ assert np.all(mask == mask2)
 assert np.all(np.mean(tnf, axis=0) < 1e-4) # normalized
 assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
-# Can instantiate the VAE
-vae = vamb.encode.VAE(103, nsamples=3, c=True)
 
 # Training model works in general
 
 with open(os.path.join(parentdir, 'test', 'data', 'fasta.fna'), 'rb') as file:
-    temp = vamb.parsecontigs.Composition.from_file(file, minlength=100)
+    temp = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc=True)
     tnf = temp.matrix
     contignames = temp.metadata.identifiers
     contiglengths = temp.metadata.lengths
-rpkm = np.ones((tnf.shape[0],3), dtype=np.float32)
-lengths = np.ones(tnf.shape[0])
+rpkm = np.ones((contiglengths.shape[0],3), dtype=np.float32)
+lengths = np.ones(contiglengths.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=2)
 
+# Can instantiate the VAE
+vae = vamb.encode.VAE(ntnf = int(tnf.shape[1]), nsamples=3, c=True)
 
 hparams = Namespace(
         validation_size=4096,   # Debug only. Validation size for training.
@@ -113,7 +113,7 @@ else:
 
 # Loading saved VAE and encoding
 modelpath = os.path.join(parentdir, 'test', 'data', 'model.pt')
-vae = vamb.encode.VAE.load(modelpath)
+#vae = vamb.encode.VAE.load(modelpath)
 
 target_latent = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_latent.npz'))
 

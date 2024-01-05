@@ -230,7 +230,7 @@ class AAE(nn.Module):
         Output: None
         """
         state = {
-                 'ntfs': self.ntnf,
+                 'ntnf': self.ntnf,
                  'nsamples': self.nsamples,
                  'alpha': self.alpha,
                  'nhiddens': self.h_n,

@@ -712,8 +712,8 @@ class VAE(_nn.Module):
                     "It is not adviced to run Vamb with fewer than 10,000 sequences "
                     "after filtering. "
                     "Please check the Vamb log file to see where the sequences were "
-                    "filtered away, and verify BAM files has sensible content."
-                )
+                    "filtered away, and verify BAM files has sensible content.")
+                
             batchsteps_set = set(batchsteps)
 
         # Get number of features
