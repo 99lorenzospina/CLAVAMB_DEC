@@ -171,7 +171,7 @@ class Composition:
       return _np.dot(raw_mat, kernel)  #dimensions: "-1"x103, every row is a kmer encoded
 
     @classmethod
-    def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100) -> C:
+    def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100, k=4, use_pc: bool = False) -> C:
         """Parses a FASTA file open in binary reading mode, returning Composition.
 
         Input:
@@ -198,7 +198,7 @@ class Composition:
             if skip:
                 continue
 
-            raw.extend(entry.kmercounts(4))
+            raw.extend(entry.kmercounts(k))
 
             if len(raw) > 256000:
                 Composition._convert(raw, projected)
@@ -206,7 +206,7 @@ class Composition:
             lengths.append(len(entry))
             contignames.append(entry.header)
 
-            pc.extend(entry.pcmercounts(2))
+            pc.extend(entry.pcmercounts(k))
 
         # Convert rest of contigs
         Composition._convert(raw, projected)
@@ -218,7 +218,8 @@ class Composition:
         tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
         lengths_arr = lengths.take()
 
-        '''tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer'''
+        if use_pc:
+            tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer
 
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
@@ -229,7 +230,7 @@ class Composition:
         return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
 
     @classmethod
-    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1]):
+    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, store_dir="./", backup_iteration=18, augmode=[-1,-1], use_pc = False):
         """Parses a FASTA file open in binary reading mode.
 
         Input:
@@ -346,8 +347,10 @@ class Composition:
 
                     for j in range(gaussian_count[i]):
                         t_gaussian = mimics.add_noise(t)
-                        gaussian.extend(t_gaussian)
-                        '''gaussian.extend(add_noise(q))'''
+                        if not use_pc:
+                            gaussian.extend(t_gaussian)
+                        else:
+                            gaussian.extend(mimics.add_noise(q))
                         # print('gaussian',_np.sum(t_gaussian-t_norm))
 
                     # mutations = mimics.transition(entry.sequence, 1 - 0.021, trans_count[i])
@@ -357,9 +360,12 @@ class Composition:
                         '''
                         As the function _kmercounts changes the input array at storage, we should reset counts_kmer's storage when using it.
                         '''
-                        counts_kmer = _np.zeros(1 << (2*k), dtype=_np.int32)
-                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
+                        if not use_pc:
+                            counts_kmer = _np.zeros(1 << (2*k), dtype=_np.int32)
+                            v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        else:
+                            counts_kmer = _np.zeros((3, 1 << k), dtype=_np.int32)
+                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer)
                         # t_trans = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_trans, - 1/(2*4**k), out=t_trans)
                         '''
@@ -372,9 +378,12 @@ class Composition:
                     if traver_count[i] != 0:
                         mutations = mimics.transversion(entry.sequence, 1 - 0.003, traver_count[i])
                     for j in range(traver_count[i]):
-                        counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
-                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
+                        if not use_pc:
+                            counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
+                            v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        else:
+                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32)
+                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer)
                         # t_traver = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_traver, - 1/(2*4**k), out=t_traver)
                         traver.extend(counts_kmer.copy())
@@ -384,9 +393,12 @@ class Composition:
                     if mutated_count[i] != 0:
                         mutations = mimics.transition_transversion(entry.sequence, 1 - 0.065, 1 - 0.003, mutated_count[i])
                     for j in range(mutated_count[i]):
-                        counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
-                        v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        '''_pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
+                        if not use_pc:
+                            counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
+                            v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        else:
+                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32)
+                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
                         # t_mutated = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_mutated, - 1/(2*4**k), out=t_mutated)
                         mutated.extend(counts_kmer.copy())
@@ -399,41 +411,67 @@ class Composition:
                 # Don't use reshape since it creates a new array object with shared memory
                 gaussian_arr = gaussian.take()
                 if gaussian_count[i] != 0:
-                    gaussian_arr.shape = (-1, gaussian_count[i], 4**k)
+                    if not use_pc:
+                        gaussian_arr.shape = (-1, gaussian_count[i], 4**k)
+                    else:
+                        gaussian_arr.shape = (-1, gaussian_count[i], 3 * 2**k)
                 trans_arr = trans.take()
                 if trans_count[i] != 0:
-                    trans_arr.shape = (-1, trans_count[i], 4**k)
+                    if not use_pc:
+                        trans_arr.shape = (-1, trans_count[i], 4**k)
+                    else:
+                        trans_arr.shape = (-1, trans_count[i], 3 * 2**k)
                 traver_arr = traver.take()
                 if traver_count[i] != 0:
-                    traver_arr.shape = (-1, traver_count[i], 4**k)
+                    if not use_pc:
+                        traver_arr.shape = (-1, traver_count[i], 4**k)
+                    else:
+                        traver_arr.shape = (-1, traver_count[i], 3 * 2**k)
                 mutated_arr = mutated.take()
                 if mutated_count[i] != 0:
-                    mutated_arr.shape = (-1, mutated_count[i], 4**k)
+                    if not use_pc:
+                        mutated_arr.shape = (-1, mutated_count[i], 4**k)
+                    else:
+                        mutated_arr.shape = (-1, mutated_count[i], 3 * 2**k)
             # AllAugmentation','GaussianNoise','Transition','Transversion','Mutation'
                 for j2 in range(gaussian_count[i]):
                     gaussian_save = gaussian_arr[:,j2,:]
-                    gaussian_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", Composition._convert_and_project_mat(gaussian_save, _KERNEL_PROJ, k))
+                    if not use_pc:
+                        gaussian_save.shape = (-1, 4**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", Composition._convert_and_project_mat(gaussian_save, _KERNEL_PROJ, k))
+                    else:
+                        gaussian_save.shape = (-1, 3* 2**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", gaussian_save)
                     index += 1
-
-                    '''for pc-mer, instead of saving _convert_and... save just gaussian_save'''
 
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
-                    trans_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", Composition._convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
+                    if not use_pc:
+                        trans_save.shape = (-1, 4**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", Composition._convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
+                    else:
+                        trans_save.shape = (-1, 3* 2**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", trans_save)
                     index += 1
 
                 for j2 in range(traver_count[i]):
                     traver_save = traver_arr[:,j2,:]
-                    traver_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
+                    if not use_pc:
+                        traver_save.shape = (-1, 3* 2**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
+                    else:
+                        traver_save.shape = (-1, 4**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", traver_save)
                     index += 1
 
                 for j2 in range(mutated_count[i]):
                     mutated_save = mutated_arr[:,j2,:]
-                    mutated_save.shape = (-1, 4**k)
-                    _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", Composition._convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
+                    if not use_pc:
+                        mutated_save.shape = (-1, 4**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", Composition._convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
+                    else:
+                        mutated_save.shape = (-1, 3* 2**k)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", mutated_save)
                     index += 1
 
                 gaussian.clear()
@@ -444,12 +482,15 @@ class Composition:
                 print(time.time(), backup_iteration, backup_iteration_2, backup_iteration_3)
 
         lengths_arr = lengths.take()
-        norm_arr = norm.take()
-        norm_arr.shape = (-1, 4**k)
+        if not use_pc:
+            norm_arr = norm.take()
+            norm_arr.shape = (-1, 4**k)
 
-        norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
-
-        '''norm_arr = pcmer.take()'''   #to take pcmer instead of tnfs
+            norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
+        
+        else:
+            norm_arr = pc.take()   #to take pcmer instead of tnfs
+            norm_arr.shape = (-1, 3 * 2**k)
 
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
