@@ -103,7 +103,7 @@ class Composition:
 
     def __init__(self, metadata: CompositionMetaData, matrix: _np.ndarray):
         assert matrix.dtype == _np.float32
-        assert matrix.shape == (metadata.nseqs, 103)
+        #assert matrix.shape == (metadata.nseqs, 103)
 
         self.metadata = metadata
         self.matrix = matrix
@@ -364,8 +364,8 @@ class Composition:
                             counts_kmer = _np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         else:
-                            counts_kmer = _np.zeros((3, 1 << k), dtype=_np.int32)
-                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer)
+                            counts_kmer = _np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
                         # t_trans = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_trans, - 1/(2*4**k), out=t_trans)
                         '''
@@ -382,8 +382,8 @@ class Composition:
                             counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         else:
-                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32)
-                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer)
+                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
                         # t_traver = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_traver, - 1/(2*4**k), out=t_traver)
                         traver.extend(counts_kmer.copy())
@@ -397,8 +397,8 @@ class Composition:
                             counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
                         else:
-                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32)
-                            v._pmercounts(bytearray(mutations[j]), k, counts_kmer) #first change counts_kmer size'''
+                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
                         # t_mutated = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_mutated, - 1/(2*4**k), out=t_mutated)
                         mutated.extend(counts_kmer.copy())
@@ -451,7 +451,7 @@ class Composition:
                         _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", Composition._convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
                     else:
                         trans_save.shape = (-1, 3* 2**k)
-                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", trans_save)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transition_{j2}.npz", trans_save)
                     index += 1
 
                 for j2 in range(traver_count[i]):
@@ -461,7 +461,7 @@ class Composition:
                         _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
                     else:
                         traver_save.shape = (-1, 3* 2**k)
-                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", traver_save)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", traver_save)
                     index += 1
 
                 for j2 in range(mutated_count[i]):
@@ -471,7 +471,7 @@ class Composition:
                         _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", Composition._convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
                     else:
                         mutated_save.shape = (-1, 3* 2**k)
-                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", mutated_save)
+                        _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Mutation_{j2}.npz", mutated_save)
                     index += 1
 
                 gaussian.clear()
