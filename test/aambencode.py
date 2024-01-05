@@ -65,7 +65,7 @@ assert np.all(np.mean(tnf, axis=0) < 1e-4) # normalized
 assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
 # Can instantiate the VAE
-vae = vamb.encode.VAE(103, nsamples=3)
+aae = vamb.aamb_encode.AAE(103, nsamples=3)
 
 # Training model works in general
 tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
@@ -74,13 +74,12 @@ lengths = np.ones(tnf.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
 
-
-vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
-vae.trainmodel(dataloader, batchsteps=None, nepochs=15)
+aae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
+aae.trainmodel(dataloader, batchsteps=None, nepochs=15)
 
 # Training model fails with weird batch steps
 try:
-    vae.trainmodel(dataloader, batchsteps=[5, 10, 15, 20], nepochs=25)
+    aae.trainmodel(dataloader, batchsteps=[5, 10, 15, 20], nepochs=25)
 except ValueError as e:
     assert 'Last batch size of' in str(e)
     pass
@@ -88,19 +87,19 @@ else:
     raise AssertionError('Should have raised ArgumentError when having too high batch size')
 
 try:
-    vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10)
+    aae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10)
 except ValueError as e:
     assert e.args == ('Max batchsteps must not equal or exceed nepochs',)
 else:
     raise AssertionError('Should have raised ArgumentError when having too high batchsteps')
 
 # Loading saved VAE and encoding
-modelpath = os.path.join(parentdir, 'test', 'data', 'model.pt')
-vae = vamb.encode.VAE.load(modelpath)
+# modelpath = os.path.join(parentdir, 'test', 'data', 'model.pt')
+# aae = vamb.aamb_encode.AAE.load(modelpath)
 
 target_latent = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_latent.npz'))
 
-latent = vae.encode(dataloader)
+latent = aae.encode(dataloader)
 
 #assert np.all(np.abs(latent - target_latent) < 1e-4)
 
@@ -110,5 +109,5 @@ inputs = inputs[0][:65], inputs[1][:65], inputs[2][:65]
 ds = torch.utils.data.dataset.TensorDataset(inputs[0], inputs[1], inputs[2])
 new_dataloader = torch.utils.data.DataLoader(dataset=ds, batch_size=64, shuffle=False, num_workers=1,)
 
-latent = vae.encode(new_dataloader)
+latent = aae.encode(new_dataloader)
 #assert np.all(np.abs(latent - target_latent[:65]) < 1e-4)

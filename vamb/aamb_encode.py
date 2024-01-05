@@ -35,13 +35,13 @@ class AAE(nn.Module):
         self,
         ntnf: int, #103
         nsamples: int,
-        nhiddens: int, #but it should be a list!
-        nlatent_l: int,
-        nlatent_y, #careful: nlatent_y should be the number of extimated clusters
-        sl: float,
-        slr: float,
-        alpha: Optional[float],
-        _cuda: bool,
+        nhiddens: int = 547, #but it should be a list!
+        nlatent_l: int = 32,
+        nlatent_y: int = 100, #careful: nlatent_y should be the number of extimated clusters
+        sl: float = 0.00964,
+        slr: float = 0.5,
+        alpha: Optional[float] = None,
+        _cuda: bool = False,
         k: int = 4,
         contrast: bool = False,
     ):
@@ -49,10 +49,18 @@ class AAE(nn.Module):
             raise ValueError(
                 f"Number of samples  should be provided to define the encoder input layer as well as the categorical latent dimension, not {nsamples}"
             )
+        
+        if nsamples < 1:
+            raise ValueError(f"nsamples must be > 0, not {nsamples}")
 
-        super(AAE, self).__init__()
+        # If only 1 sample, we weigh alpha and nhiddens differently
         if alpha is None:
             alpha = 0.15 if nsamples > 1 else 0.50
+        
+        if not (0 < alpha < 1):
+            raise ValueError(f"alpha must be 0 < alpha < 1, not {alpha}")
+
+        super(AAE, self).__init__()
 
         self.nsamples = nsamples
         self.ntnf = ntnf
@@ -279,9 +287,22 @@ class AAE(nn.Module):
 
         #AAMB
         if hparams == _Namespace():
-          for depths_in, tnf_in in data_loader:
+          for depths_in, tnfs_in, _ in data_loader:
+                
+                nrows, _ = depths_in.shape
+
+                # Adversarial ground truths
+
+                labels_prior = Variable(
+                    Tensor(nrows, 1).fill_(1.0), requires_grad=False
+                )
+                labels_latent = Variable(
+                    Tensor(nrows, 1).fill_(0.0), requires_grad=False
+                )
+
+
                 depths_in.requires_grad = True
-                tnf_in.requires_grad = True
+                tnfs_in.requires_grad = True
 
 
                 if self.usecuda:
@@ -307,7 +328,7 @@ class AAE(nn.Module):
 
                 if self.usecuda:
                     depths_in = depths_in.cuda()
-                    tnf_in = tnf_in.cuda()
+                    tnfs_in = tnfs_in.cuda()
 
                 optimizer_E.zero_grad()
                 optimizer_D.zero_grad()
@@ -381,7 +402,6 @@ class AAE(nn.Module):
                 optimizer_D_y.step()
 
                 ED_loss_e += float(ed_loss.item())
-                loss_e += float(loss.item())
                 V_loss_e += float(vae_loss.item())
                 D_z_loss_e += float(d_z_loss.item())
                 D_y_loss_e += float(d_y_loss.item())
@@ -406,169 +426,170 @@ class AAE(nn.Module):
 
                 logfile.flush()
         #CLAMB
-        for depths_in, tnfs_in, tnf_aug1, tnf_aug2 in  data_loader:  # weights currently unused here
-              nrows, _ = depths_in.shape
+        else:
+            for depths_in, tnfs_in, tnf_aug1, tnf_aug2 in  data_loader:  # weights currently unused here
+                nrows, _ = depths_in.shape
 
-              depths_in.requires_grad = True
-              tnfs_in.requires_grad = True
-              tnf_aug1.requires_grad = True
-              tnf_aug2.requires_grad = True
+                depths_in.requires_grad = True
+                tnfs_in.requires_grad = True
+                tnf_aug1.requires_grad = True
+                tnf_aug2.requires_grad = True
 
-              # Adversarial ground truths
+                # Adversarial ground truths
 
-              labels_prior = Variable(
-                  Tensor(nrows, 1).fill_(1.0), requires_grad=False
-              )
-              labels_latent = Variable(
-                  Tensor(nrows, 1).fill_(0.0), requires_grad=False
-              )
+                labels_prior = Variable(
+                    Tensor(nrows, 1).fill_(1.0), requires_grad=False
+                )
+                labels_latent = Variable(
+                    Tensor(nrows, 1).fill_(0.0), requires_grad=False
+                )
 
-              # Sample noise as discriminator Z,Y ground truth
+                # Sample noise as discriminator Z,Y ground truth
 
-              if self.usecuda:
-                  z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
-                  z_prior.cuda()
-                  ohc = RelaxedOneHotCategorical(
-                      torch.tensor([T], device="cuda"),
-                      torch.ones([nrows, self.y_len], device="cuda"),
-                  )
-                  y_prior = ohc.sample()
-                  y_prior = y_prior.cuda()
+                if self.usecuda:
+                    z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
+                    z_prior.cuda()
+                    ohc = RelaxedOneHotCategorical(
+                        torch.tensor([T], device="cuda"),
+                        torch.ones([nrows, self.y_len], device="cuda"),
+                    )
+                    y_prior = ohc.sample()
+                    y_prior = y_prior.cuda()
 
-              else:
-                  z_prior = Variable(
-                      Tensor(np.random.normal(0, 1, (nrows, self.ld)))
-                  )
-                  ohc = RelaxedOneHotCategorical(
-                      T, torch.ones([nrows, self.y_len])
-                  )
-                  y_prior = ohc.sample()
+                else:
+                    z_prior = Variable(
+                        Tensor(np.random.normal(0, 1, (nrows, self.ld)))
+                    )
+                    ohc = RelaxedOneHotCategorical(
+                        T, torch.ones([nrows, self.y_len])
+                    )
+                    y_prior = ohc.sample()
 
-              del ohc
+                del ohc
 
-              if self.usecuda:
-                  depths_in = depths_in.cuda()
-                  tnfs_in = tnfs_in.cuda()
-                  tnf_aug1 = tnf_aug1.cuda()
-                  tnf_aug2 = tnf_aug2.cuda()
+                if self.usecuda:
+                    depths_in = depths_in.cuda()
+                    tnfs_in = tnfs_in.cuda()
+                    tnf_aug1 = tnf_aug1.cuda()
+                    tnf_aug2 = tnf_aug2.cuda()
 
-              # -----------------
-              #  Train Generator
-              # -----------------
-              optimizer_E.zero_grad()
-              optimizer_D.zero_grad()
-              optimizer_awl.zero_grad()
+                # -----------------
+                #  Train Generator
+                # -----------------
+                optimizer_E.zero_grad()
+                optimizer_D.zero_grad()
+                optimizer_awl.zero_grad()
 
-              # Forward pass
-              (
-                  mu,
-                  logvar,
-                  depths_out,
-                  tnfs_out,
-                  z_latent,
-                  y_latent,
-                  d_z_latent,
-                  d_y_latent,
-              ) = self(depths_in, tnfs_in, z_prior, y_prior)
+                # Forward pass
+                (
+                    mu,
+                    logvar,
+                    depths_out,
+                    tnfs_out,
+                    z_latent,
+                    y_latent,
+                    d_z_latent,
+                    d_y_latent,
+                ) = self(depths_in, tnfs_in, z_prior, y_prior)
 
-              mu1, logvar1, depths_out1, tnf_out_aug1, z_latent1, y_latent1, d_z_latent1, d_y_latent1 = self(depths_in, tnf_aug1, z_prior, y_prior)
-              mu2, logvar2, depths_out2, tnf_out_aug2, z_latent2, y_latent2, d_z_latent2, d_y_latent2 = self(depths_in, tnf_aug2, z_prior, y_prior)
+                mu1, logvar1, depths_out1, tnf_out_aug1, z_latent1, y_latent1, d_z_latent1, d_y_latent1 = self(depths_in, tnf_aug1, z_prior, y_prior)
+                mu2, logvar2, depths_out2, tnf_out_aug2, z_latent2, y_latent2, d_z_latent2, d_y_latent2 = self(depths_in, tnf_aug2, z_prior, y_prior)
 
-              loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature) #shouldn't be self.nt_xent_loss(torch.cat((depths_out1, tnf_out1), 1), torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)?
-              loss_contrast2 = self.nt_xent_loss(tnf_out_aug2, tnfs_out, temperature=hparams.temperature)
-              loss_contrast3 = self.nt_xent_loss(tnfs_out, tnf_out_aug1, temperature=hparams.temperature)
+                loss_contrast1 = self.nt_xent_loss(tnf_out_aug1, tnf_out_aug2, temperature=hparams.temperature) #shouldn't be self.nt_xent_loss(torch.cat((depths_out1, tnf_out1), 1), torch.cat((depths_out2, tnf_out2), 1), temperature=hparams.temperature)?
+                loss_contrast2 = self.nt_xent_loss(tnf_out_aug2, tnfs_out, temperature=hparams.temperature)
+                loss_contrast3 = self.nt_xent_loss(tnfs_out, tnf_out_aug1, temperature=hparams.temperature)
 
-              vae_loss, ce, sse = self.calc_loss(
-                  depths_in, depths_out, tnfs_in, tnfs_out
-              )
-              g_loss_adv_z = adversarial_loss(
-                  self._discriminator_z(z_latent), labels_prior
-              )
-              g_loss_adv_y = adversarial_loss(
-                  self._discriminator_y(y_latent), labels_prior
-              )
+                vae_loss, ce, sse = self.calc_loss(
+                    depths_in, depths_out, tnfs_in, tnfs_out
+                )
+                g_loss_adv_z = adversarial_loss(
+                    self._discriminator_z(z_latent), labels_prior
+                )
+                g_loss_adv_y = adversarial_loss(
+                    self._discriminator_y(y_latent), labels_prior
+                )
 
-              #Loss function L
-              ed_loss = (
-                  (1 - self.sl) * vae_loss
-                  + (self.sl * self.slr) * g_loss_adv_z
-                  + (self.sl * (1 - self.slr)) * g_loss_adv_y
-              )
+                #Loss function L
+                ed_loss = (
+                    (1 - self.sl) * vae_loss
+                    + (self.sl * self.slr) * g_loss_adv_z
+                    + (self.sl * (1 - self.slr)) * g_loss_adv_y
+                )
 
-              #Final loss function with contrastive learning
-              # NOTE: Add weight to avoid gradient disappearance
-              loss = awl(hparams.sigma*loss_contrast1, hparams.sigma*loss_contrast2, hparams.sigma*loss_contrast3) + 10000*ed_loss
+                #Final loss function with contrastive learning
+                # NOTE: Add weight to avoid gradient disappearance
+                loss = awl(hparams.sigma*loss_contrast1, hparams.sigma*loss_contrast2, hparams.sigma*loss_contrast3) + 10000*ed_loss
 
-              loss.backward()
-              optimizer_E.step()
-              optimizer_D.step()
+                loss.backward()
+                optimizer_E.step()
+                optimizer_D.step()
 
-              optimizer_awl.step()
+                optimizer_awl.step()
 
-              # ----------------------
-              #  Train Discriminator z
-              # ----------------------
+                # ----------------------
+                #  Train Discriminator z
+                # ----------------------
 
-              optimizer_D_z.zero_grad()
-              mu, logvar = self._encode(depths_in, tnfs_in)[:2]
-              z_latent = self._reparameterization(mu, logvar)
+                optimizer_D_z.zero_grad()
+                mu, logvar = self._encode(depths_in, tnfs_in)[:2]
+                z_latent = self._reparameterization(mu, logvar)
 
-              d_z_loss_prior = adversarial_loss(
-                  self._discriminator_z(z_prior), labels_prior
-              )
-              d_z_loss_latent = adversarial_loss(
-                  self._discriminator_z(z_latent), labels_latent
-              )
-              d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
+                d_z_loss_prior = adversarial_loss(
+                    self._discriminator_z(z_prior), labels_prior
+                )
+                d_z_loss_latent = adversarial_loss(
+                    self._discriminator_z(z_latent), labels_latent
+                )
+                d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
 
-              d_z_loss.backward()
-              optimizer_D_z.step()
+                d_z_loss.backward()
+                optimizer_D_z.step()
 
-              # ----------------------
-              #  Train Discriminator y
-              # ----------------------
+                # ----------------------
+                #  Train Discriminator y
+                # ----------------------
 
-              optimizer_D_y.zero_grad()
-              y_latent = self._encode(depths_in, tnfs_in)[2]
-              d_y_loss_prior = adversarial_loss(
-                  self._discriminator_y(y_prior), labels_prior
-              )
-              d_y_loss_latent = adversarial_loss(
-                  self._discriminator_y(y_latent), labels_latent
-              )
-              d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
+                optimizer_D_y.zero_grad()
+                y_latent = self._encode(depths_in, tnfs_in)[2]
+                d_y_loss_prior = adversarial_loss(
+                    self._discriminator_y(y_prior), labels_prior
+                )
+                d_y_loss_latent = adversarial_loss(
+                    self._discriminator_y(y_latent), labels_latent
+                )
+                d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
 
-              d_y_loss.backward()
-              optimizer_D_y.step()
+                d_y_loss.backward()
+                optimizer_D_y.step()
 
-              ED_loss_e += float(ed_loss.item())
-              loss_e += float(loss.item())
-              V_loss_e += float(vae_loss.item())
-              D_z_loss_e += float(d_z_loss.item())
-              D_y_loss_e += float(d_y_loss.item())
-              CE_e += float(ce.item())
-              SSE_e += float(sse.item())
+                ED_loss_e += float(ed_loss.item())
+                loss_e += float(loss.item())
+                V_loss_e += float(vae_loss.item())
+                D_z_loss_e += float(d_z_loss.item())
+                D_y_loss_e += float(d_y_loss.item())
+                CE_e += float(ce.item())
+                SSE_e += float(sse.item())
 
-              time_epoch_1 = time.time()
-              time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+                time_epoch_1 = time.time()
+                time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
 
-              if logfile is not None:
-                  print(
-                      "\tEpoch: {}\t Loss: {:.6f}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
-                          epoch_i + 1,
-                          loss_e / total_batches_inthis_epoch,
-                          ED_loss_e / total_batches_inthis_epoch,
-                          V_loss_e / total_batches_inthis_epoch,
-                          CE_e / total_batches_inthis_epoch,
-                          SSE_e / total_batches_inthis_epoch,
-                          D_z_loss_e / total_batches_inthis_epoch,
-                          D_y_loss_e / total_batches_inthis_epoch,
-                          data_loader.batch_size,
-                          time_e,
-                      ),
-                      file=logfile,
-                  )
-                  logfile.flush()
+                if logfile is not None:
+                    print(
+                        "\tEpoch: {}\t Loss: {:.6f}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
+                            epoch_i + 1,
+                            loss_e / total_batches_inthis_epoch,
+                            ED_loss_e / total_batches_inthis_epoch,
+                            V_loss_e / total_batches_inthis_epoch,
+                            CE_e / total_batches_inthis_epoch,
+                            SSE_e / total_batches_inthis_epoch,
+                            D_z_loss_e / total_batches_inthis_epoch,
+                            D_y_loss_e / total_batches_inthis_epoch,
+                            data_loader.batch_size,
+                            time_e,
+                        ),
+                        file=logfile,
+                    )
+                    logfile.flush()
 
         # save model
         if modelfile is not None:
@@ -596,14 +617,24 @@ class AAE(nn.Module):
         return None
     
     def trainmodel(
-        self, dataloader, T, nepochs=320, lrate=1e-3,
+        self, dataloader, T=0.1596, nepochs=320, lrate=1e-3,
                    batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None
     ):
 
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
-        batchsteps_set = set(batchsteps)
+
+        if lrate < 0:
+            raise ValueError(f"Learning rate must be positive, not {lrate}")
+
+        if nepochs < 1:
+            raise ValueError("Minimum 1 epoch, not {nepochs}")
+
+        if batchsteps is None:
+            batchsteps_set: set[int] = set()
+        else:
+            batchsteps_set = set(batchsteps)
         # Get number of features
-        depthstensor, tnftensor = dataloader.dataset.tensors
+        depthstensor, tnftensor, _ = dataloader.dataset.tensors
         ncontigs, nsamples = depthstensor.shape
 
         # Initialize generator and discriminator
