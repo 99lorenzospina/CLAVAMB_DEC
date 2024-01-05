@@ -457,10 +457,10 @@ class Composition:
                 for j2 in range(traver_count[i]):
                     traver_save = traver_arr[:,j2,:]
                     if not use_pc:
-                        traver_save.shape = (-1, 3* 2**k)
+                        traver_save.shape = (-1, 4**k)
                         _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_Transversion_{j2}.npz", Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
                     else:
-                        traver_save.shape = (-1, 4**k)
+                        traver_save.shape = (-1, 3* 2**k)
                         _np.savez(f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[index]}_GaussianNoise_{j2}.npz", traver_save)
                     index += 1
 
