@@ -65,7 +65,7 @@ assert np.all(mask == mask2)
 assert np.all(np.mean(tnf, axis=0) < 1e-4) # normalized
 assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
-# Can instantiate the VAE
+# Can instantiate the AAE
 aae = vamb.aamb_encode.AAE(103, nsamples=3)
 
 # Training model works in general

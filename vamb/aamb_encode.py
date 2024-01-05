@@ -213,7 +213,7 @@ class AAE(nn.Module):
             k = 4
       state = dictionary['state']
 
-      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, k=k, c=c)
+      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, k=k, contrast=c)
       aae.load_state_dict(state)
 
       if cuda:
@@ -618,7 +618,7 @@ class AAE(nn.Module):
         return None
     
     def trainmodel(
-        self, dataloader, T=0.1596, nepochs=320, lrate=1e-3,
+        self, data_loader, T=0.1596, nepochs=320, lrate=1e-3,
                    batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None
     ):
 
@@ -635,7 +635,7 @@ class AAE(nn.Module):
         else:
             batchsteps_set = set(batchsteps)
         # Get number of features
-        depthstensor, tnftensor, _ = dataloader.dataset.tensors
+        depthstensor, tnftensor, _ = data_loader.dataset.tensors
         ncontigs, nsamples = depthstensor.shape
 
         # Initialize generator and discriminator
@@ -762,16 +762,16 @@ class AAE(nn.Module):
                   data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
                       shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
-              self.trainepoch(epoch, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
+              self.trainepoch(epoch_i, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
         
         #Non contrastive learning
         else:
-            data_loader = _DataLoader(dataset=dataloader.dataset,
-                                    batch_size=dataloader.batch_size,
+            data_loader = _DataLoader(dataset=data_loader.dataset,
+                                    batch_size=data_loader.batch_size,
                                     shuffle=True,
                                     drop_last=False,
-                                    num_workers=dataloader.num_workers,
-                                    pin_memory=dataloader.pin_memory)
+                                    num_workers=data_loader.num_workers,
+                                    pin_memory=data_loader.pin_memory)
             for epoch in range(nepochs):
                 if epoch in batchsteps_set:
                     data_loader = _DataLoader(dataset=data_loader.dataset,
