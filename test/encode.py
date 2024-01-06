@@ -46,8 +46,8 @@ else:
 try:
     dataloader, mask = vamb.encode.make_dataloader(rpkm.flatten(), tnf, lengths, batchsize=128)
 except ValueError as e:
+    assert 'Lengths of RPKM, TNF and lengths' in str(e)
     pass
-    #assert e.args == ('Lengths of RPKM and TNF must be the same',)
 else:
     raise AssertionError('Should have raised ArgumentError when instantiating dataloader')
 
@@ -90,7 +90,7 @@ else:
 try:
     vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=10)
 except ValueError as e:
-    assert e.args == ('Max batchsteps must not equal or exceed nepochs',)
+    assert 'Max batchsteps must not equal or exceed nepochs' in str(e)
 else:
     raise AssertionError('Should have raised ArgumentError when having too high batchsteps')
 

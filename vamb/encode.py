@@ -354,7 +354,7 @@ class VAE(_nn.Module):
         tnf_out: Tensor,
         mu: Tensor,
         logsigma: Tensor,
-        weights: Tensor = None,
+        weights: Tensor,
     ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         # If multiple samples, use cross entropy, else use SSE for abundance
         if self.nsamples > 1:
@@ -371,9 +371,7 @@ class VAE(_nn.Module):
         kld_weight = 1 / (self.nlatent * self.beta)
         reconstruction_loss = ce * ce_weight + sse * sse_weight
         kld_loss = kld * kld_weight
-        loss = (reconstruction_loss + kld_loss)
-        if weights!= None:
-            loss *= weights
+        loss = (reconstruction_loss + kld_loss)*weights
 
         return loss.mean(), ce.mean(), sse.mean(), kld.mean()
 
