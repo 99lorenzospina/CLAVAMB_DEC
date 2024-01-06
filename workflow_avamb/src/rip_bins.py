@@ -84,6 +84,12 @@ def get_contig_length(names: Sequence[str], lengths: Sequence[int]) -> dict[str,
     return dict(zip(names, lengths))
 
 
+"""
+In breve, la funzione itera attraverso i cluster e i relativi contig,
+accumulando la lunghezza di ciascun contig nel totale del cluster.
+Il risultato è un OrderedDict che mappa i nomi dei cluster alle loro
+lunghezze totali, ordinato per chiave.
+"""
 def get_cluster_length(
     cluster_contigs: dict[str, set[str]], contig_length: dict[str, int]
 ) -> OrderedDict[str, int]:
@@ -310,6 +316,17 @@ def make_all_components_pair(
     )
 
 
+"""
+La funzione itera attraverso i componenti connessi
+nel grafo e crea coppie di bin (cl_i, cl_j) per
+ciascun componente. I contig che sono in entrambi i
+cluster vengono identificati e rimossi dai rispettivi
+bin. I bin "ripped" vengono quindi scritti nella
+directory specificata (path_ripped), e i nomi dei
+cluster associati ai bin "ripped" vengono aggiunti a
+un insieme ripped_clusters_set. Infine, se la directory
+path_ripped risulta vuota, viene rimossa.
+"""
 def create_ripped_clusters_and_write_ripped_bins(
     graph_clusters: nx.Graph,
     cluster_contigs: dict[str, set[str]],
@@ -363,6 +380,11 @@ def create_ripped_clusters_and_write_ripped_bins(
     return ripped_clusters_set
 
 
+"""
+La funzione legge il file fasta del bin originale, estrae i contig che
+non sono presenti nell'insieme contigs_cluster_ripped e scrive questi
+contig nel nuovo bin "ripped" 
+"""
 def write_ripped_bin(
     contigs_cluster_ripped, bin_i_path: str, bin_i_ripped_path: str
 ) -> None:

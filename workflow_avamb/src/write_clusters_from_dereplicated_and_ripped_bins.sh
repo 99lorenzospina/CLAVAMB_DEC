@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+#L'obiettivo principale dello script sembra essere quello di
+#creare un elenco di cluster e contigs dai file ".fna" presenti
+#nelle sottodirectory di una directory specificata.
 
 while getopts "d:o:" opt; do
   case $opt in

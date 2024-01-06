@@ -2,7 +2,12 @@ import numpy as np
 import json
 import argparse
 
-
+"""
+In breve, la funzione legge i dati dal file CheckM, aggiorna i punteggi di
+completezza e contaminazione per ciascun cluster nel dizionario cluster_score,
+stampando i punteggi prima e dopo l'aggiornamento. Infine, restituisce il
+dizionario aggiornato.
+"""
 def update_cluster_score_bin_path(
     path_checkm_ripped: str, cluster_score: dict[str, tuple[float, float]]
 ):
