@@ -414,6 +414,9 @@ def write_clusters(
     clusternumber = 0
     ncontigs = 0
 
+    if isinstance(clusters, dict):
+        clusters = clusters.items()
+
     for clustername, contigs in clusters:
         if len(contigs) < min_size:
             continue

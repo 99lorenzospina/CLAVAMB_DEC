@@ -33,10 +33,17 @@ dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
 vae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
 aae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
 
+contignames = []
+while len(contignames) < tnf.shape[0]:
+    nuovo_codice = str(random.randint(100, 999))
+    if nuovo_codice not in contignames:
+        contignames.append(nuovo_codice)
+
 latent = vae.encode(dataloader)
-vamb.vambtools.write_npz(os.path.join(outdir, "test_vae_latent.npz"), latent)
-cluster_y, latent_aae = aae.get_latents(dataloader)
-vamb.vambtools.write_npz(os.path.join(outdir, "test_vae_latent.npz"), latent_aae)
+vamb.vambtools.write_npz(os.path.join(outdir, "target_vae_latent.npz"), latent)
+cluster_y, latent_aae = aae.get_latents(contignames, dataloader)
+vamb.vambtools.write_npz(os.path.join(outdir, "target_aae_z_latent.npz"), latent_aae)
+
 
 cluster_generator = vamb.cluster.ClusterGenerator(
         latent,
@@ -46,12 +53,6 @@ cluster_generator = vamb.cluster.ClusterGenerator(
         normalized=False,
         cuda=False,
     )
-
-contignames = []
-while len(contignames) < tnf.shape[0]:
-    nuovo_codice = str(random.randint(100, 999))
-    if nuovo_codice not in contignames:
-        contignames.append(nuovo_codice)
 
 renamed = (
     (str(cluster_index + 1), {contignames[i] for i in members})
@@ -91,6 +92,13 @@ cluster_generator = vamb.cluster.ClusterGenerator(
 
 clusterspath = os.path.join(outdir, "target_aae_clusters.tsv")
 
+maybe_split = (
+        (str(cluster_index + 1), {contignames[i] for i in members})
+        for (cluster_index, (_, members)) in enumerate(
+            map(lambda x: x.as_tuple(), cluster_generator)
+        )
+    )
+
 with open(clusterspath, "w") as clustersfile:
     clusternumber, ncontigs = vamb.vambtools.write_clusters(
         clustersfile,
@@ -102,6 +110,8 @@ with open(clusterspath, "w") as clustersfile:
     )
 
 clusterspath= os.path.join(outdir, "target_aae_y_clusters.tsv") 
+
+maybe_split = cluster_y
 
 with open(clusterspath, "w") as clustersfile:
             clusternumber, ncontigs = vamb.vambtools.write_clusters(
