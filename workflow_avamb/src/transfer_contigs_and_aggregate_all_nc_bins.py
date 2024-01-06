@@ -135,6 +135,8 @@ def mv_single_ripped_nc_bins(
     cluster_score,
     path_run,
     cluster_sample,
+    min_comp,
+    max_cont,
 ):
     """Mv nc bins that were ripped only because they had meaningless edges"""
     nc_clusters_ripped_single = set()
