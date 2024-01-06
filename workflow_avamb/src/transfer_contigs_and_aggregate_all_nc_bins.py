@@ -84,6 +84,7 @@ def main(
     )
 
 
+"""Associa a ciascun cluster il sample da cui provengono i suoi contig"""
 def get_cluster_sample(cluster_contigs, bin_separator):
     """{cluster:sample} for all clusters"""
     cluster_sample = {}
@@ -97,6 +98,7 @@ def get_cluster_sample(cluster_contigs, bin_separator):
     return cluster_sample
 
 
+"""Sposta i bin non ripped (senza intersezioni con altri bin) nella cartella apposita"""
 def mv_nc_not_r_nc_bins(
     cluster_not_r_contigs, cluster_sample, cluster_scores, drep_folder, bin_path
 ):
@@ -125,7 +127,7 @@ def mv_nc_not_r_nc_bins(
 
 # For ripped bins
 
-
+"""Sposta quei bin ripped solo a causa dei bordi insignificanti"""
 def mv_single_ripped_nc_bins(
     ripped_bins_scores_ar,
     drep_folder,
@@ -171,6 +173,11 @@ def mv_single_ripped_nc_bins(
     return nc_clusters_ripped_single
 
 
+"""Estrae i punteggi di completezza e contaminazione per i bin
+che sono stati modificati (ripped) a causa di una ridondanza di
+contigs e restituisce un dizionario che associa ciascun cluster
+a una lista di punteggi di completezza e contaminazione e una
+lista di coppie di cluster modificati"""
 def get_cluster_r_scores(ripped_bins_scores_ar):
     """{cluster:[comp,cont]} for ripped clusters"""
 
@@ -180,20 +187,30 @@ def get_cluster_r_scores(ripped_bins_scores_ar):
     for row in ripped_bins_scores_ar:
         # print(row)
         bin_A_bin_B_name, comp, cont = row[:3]
+
+        # Verifica se la riga contiene "--" indicando una coppia di cluster
         if "--" in bin_A_bin_B_name:
+            # Estrai i nomi dei bin e dei cluster dalla riga
             bin_A_name, bin_B_name = bin_A_bin_B_name.split("--")
             cluster_A_name, cluster_B_name = bin_A_name, bin_B_name
 
+            # Aggiungi i punteggi al dizionario associato ai cluster
             cluster_ripped_scores_dict[cluster_A_name] = [float(comp), float(cont)]
 
+            # Aggiungi la coppia di cluster all'elenco delle coppie in ordine di punteggio
             cluster_r_pairs.append(OrderedSet([cluster_A_name, cluster_B_name]))
         else:
+            # Se la riga non contiene "--", si tratta di un singolo cluster
             cluster_A_name = bin_A_bin_B_name.replace(".fna", "")
+            # Aggiungi i punteggi al dizionario associato al cluster
             cluster_ripped_scores_dict[cluster_A_name] = [float(comp), float(cont)]
 
+    # Restituisce il dizionario dei punteggi e l'elenco delle coppie di cluster
     return cluster_ripped_scores_dict, cluster_r_pairs
 
 
+""" Per i bin con sovrapposizioni, seleziona il migliore tra i
+due e sposta i contigs del bin selezionato"""
 def choose_best_ripped_bin_and_mv_if_nc(
     cluster_r_scores,
     cluster_scores,
@@ -230,8 +247,9 @@ def choose_best_ripped_bin_and_mv_if_nc(
         cluster_B_dif = cluster_B_score - cluster_B_r_score
         cluster_A_dif = cluster_A_score - cluster_A_r_score
 
+        #Seleziona il clustering il cui punteggio peggiora di più
         keeper = np.argmax([cluster_A_dif, cluster_B_dif])
-
+        
         if keeper == 0:
             print(
                 "%s keeps the intersecting contigs whereas %s does not "
