@@ -1,7 +1,6 @@
 import sys
 import os
 import numpy as np
-import torch
 import random
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
