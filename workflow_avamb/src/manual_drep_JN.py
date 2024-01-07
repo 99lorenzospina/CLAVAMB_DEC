@@ -55,6 +55,7 @@ def main(
     )
     del bin_by_name
 
+    #dereplicate
     dereplicated = dereplicate(union_bins, qualities, lengths, bin_lengths, min_cov)
     del bin_lengths
 
@@ -69,6 +70,9 @@ def main(
                 print(bin_name, contig_names[contig], sep="\t", file=file)
 
 
+"""
+Esamina il quality report e filtra fuori i bin non validi
+"""
 def load_checkm2(
     quality_report: dict[str, list],
     min_completeness: float,
@@ -108,9 +112,13 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
+    #bin_names: nomi dei bin validi
+    #qualities: tuple con i punteggi dei bin validi
+    #bin_by_name: dizionario che mappa i bin validi a BinID, gli altri a None
     return (bin_names, qualities, bin_by_name)
 
 
+#un "binning" è una clusterizzazione dei dati in vari bins
 def load_binnings(
     binnings: Sequence[Path],
     contig_names: Sequence[str],
@@ -121,6 +129,8 @@ def load_binnings(
     Load clusters.tsv files from each binning, and filter away those assigned to be discarded based on CheckM2 data.
     Return bin length and bins, each represented as a set of ContigId
     """
+
+    #il dizionario mappa ogni nome di contig a indice e lunghezza corrispondenti
     id_len_of_contig_name: dict[str, tuple[ContigId, int]] = dict()
     for (index, (name, length)) in enumerate(zip(contig_names, lengths)):
         id_len_of_contig_name[name] = (ContigId(index), length)
@@ -148,6 +158,7 @@ def load_binnings(
                 # Means: Below threshold, so skip it
                 elif bin is None:
                     continue
+                #Else il cluster è valido, lo aggiungo a union_bins
                 else:
                     ids: set[ContigId] = set()
                     for contig in contigs:
@@ -166,12 +177,16 @@ def load_binnings(
         assert isinstance(i, set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
+    #computa la lunghezza dei bins
     for contigs in union_bins_asserted:
         bin_lengths.append(sum(lengths[contig] for contig in contigs))
 
     return (bin_lengths, union_bins_asserted)
 
 
+"""
+Rimuove i clusters troppo piccoli
+"""
 def filterclusters(
     clusters: Mapping[str, set], lengthof: Mapping[str, int]
 ) -> Mapping[str, set]:
@@ -202,6 +217,9 @@ def dereplicate(
     return [BinId(i) for i in range(len(bin_lengths)) if BinId(i) not in to_remove]
 
 
+"""
+Associa a ciascuna contig i bins in cui appare
+"""
 def get_binsof(union_bins: Iterable[Iterable[ContigId]]) -> dict[ContigId, list[BinId]]:
     "Makes a dict from contig -> list of bins the contig is present in, if in multiple bins"
     binsof: dict[ContigId, Union[BinId, list[BinId]]] = dict()
