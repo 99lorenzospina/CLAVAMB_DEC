@@ -1,6 +1,7 @@
+####NOT WORKING
 """!
 
-@brief The module contains G-Means algorithm and other related services.
+@brief The module contains G-Means algorithm and other related services. https://pyclustering.github.io/docs/0.9.2/html/d8/dd0/gmeans_8py_source.html
 @details Implementation based on paper @cite inproceedings::cluster::gmeans::1.
 
 @authors Andrei Novikov (pyclustering@yandex.ru)
@@ -36,7 +37,7 @@ from pyclustering.cluster.kmeans import kmeans
 from pyclustering.utils import distance_metric, type_metric
 
 
-class gmeans:
+class SpeciesNumber:
     """!
     @brief Class implements G-Means clustering algorithm.
     @details The G-means algorithm starts with a small number of centers, and grows the number of centers.
@@ -101,6 +102,7 @@ class gmeans:
 
         @param[in] data (array_like): Input data that is presented as array of points (objects), each point should be
                     represented by array_like data structure.
+                    in my case, data is a np array, each row the tnf+abudance for a contig
         @param[in] k_init (uint): Initial amount of centers (by default started search from 1).
         @param[in] ccore (bool): Defines whether CCORE library (C/C++ part of the library) should be used instead of
                     Python code.
@@ -118,8 +120,10 @@ class gmeans:
 
         self.__clusters = []
         self.__centers = []
+        self.definitive_centers = []
         self.__total_wce = 0.0
         self.__ccore = ccore
+        self.nclusters = 1
 
         self.__tolerance = kwargs.get('tolerance', 0.025)
         self.__repeat = kwargs.get('repeat', 3)
@@ -141,7 +145,7 @@ class gmeans:
 
         """
         if self.__ccore is True:
-            return self._process_by_ccore() #NOT WORKING
+            return self._process_by_ccore()
 
         return self._process_by_python()
 
@@ -163,15 +167,26 @@ class gmeans:
         self.__clusters, self.__centers, _ = self._search_optimal_parameters(self.__data, self.__k_init)
         while True:
             current_amount_clusters = len(self.__clusters)
-            self._statistical_optimization()
+            print("current_amount_cluster is ", len(self.__clusters))
+            added = self._statistical_optimization()
 
-            if current_amount_clusters == len(self.__centers):
+            if not added:
                 break
 
             self._perform_clustering()
 
+        self.nclusters = len(self.definitive_centers)
+        print("setting nclusters as ", self.nclusters)
         return self
 
+    def estimate_k(self):
+        """!
+            @brief Return the value of k.
+            
+            @return (int) Number of clusters
+
+        """
+        return self.nclusters
 
     def predict(self, points):
         """!
@@ -211,7 +226,7 @@ class gmeans:
 
     def get_centers(self):
         """!
-        @brief Returns list of centers of allocated clusters.
+        @brief Returns list of centers of currently elaborating clusters.
 
         @return (array_like) Allocated centers.
 
@@ -220,6 +235,15 @@ class gmeans:
 
         """
         return self.__centers
+
+    def get_definitive_centers(self):
+        """!
+        @brief Returns list of centers of definitvely allocated clusters.
+        
+        @return (array_like) Allocated centers.
+        
+        """
+        return self.definitive_centers
 
 
     def get_total_wce(self):
@@ -235,8 +259,6 @@ class gmeans:
 
         return self.__total_wce
 
-    def estimate_k(self):
-        return len(self.__clusters)
 
     def _statistical_optimization(self):
         """!
@@ -244,59 +266,65 @@ class gmeans:
 
         """
         centers = []
+        added = False
         for index in range(len(self.__clusters)):
-            new_centers = self._split_and_search_optimal(self.__clusters[index])
-            if new_centers is None:
-                centers.append(self.__centers[index])
+            #either new_centers contains the new centers or the points of the cluster
+            new_centers, split = self._split_and_search_optimal(self.__clusters[index])
+            if not split:  #the cluster is not split!
+                print("not split")
+                self.definitive_centers.append(self.__centers[index])
+                points_to_remove = new_centers
+                indices_to_keep = numpy.setdiff1d(numpy.arange(len(self.__data)), numpy.where(numpy.isin(self.__data, points_to_remove).all(axis=1)))
+                self.__data = self.__data[indices_to_keep]
             else:
+                print("split")
                 centers += new_centers
+                added = True
 
         self.__centers = centers
+        return added
 
 
     def _split_and_search_optimal(self, cluster):
         """!
         @brief Split specified cluster into two by performing K-Means clustering and check correctness by
-                Anderson-Darling test.
+                Kolmogorov-Smirnov test.
 
-        @param[in] cluster (array_like) Cluster that should be analysed and optimized by splitting if it is required.
+        @param[in] cluster (array_like) Cluster that should be analyzed and optimized by splitting if it is required.
 
         @return (array_like) Two new centers if two new clusters are considered as more suitable.
                 (None) If current cluster is more suitable.
         """
-        if len(cluster) == 1:
-            return None
 
         points = [self.__data[index_point] for index_point in cluster]
-        new_clusters, new_centers, _ = self._search_optimal_parameters(points, 2)
+        if len(cluster) == 1:
+            return points, False
+        _, new_centers, _ = self._search_optimal_parameters(points, 2)
+
 
         if len(new_centers) > 1:
-            accept_null_hypothesis = self._is_null_hypothesis(points, new_centers)
+            v = numpy.subtract(new_centers[0], new_centers[1])
+            square_norm = numpy.sum(numpy.multiply(v, v))
+            points = numpy.divide(numpy.sum(numpy.multiply(new_centers, v), axis=1), square_norm)
+            normalized_cluster_data = (points - numpy.mean(points, axis=0)) / numpy.std(points, axis=0)
+            #normalized_cluster_data = self._project_data(points, v)
+            sorted_data = numpy.sort(normalized_cluster_data, axis=0)
+            cdf = scipy.stats.norm.cdf(sorted_data)
+            print(cdf)
+            ecdf = numpy.arange(1, len(sorted_data) + 1) / len(sorted_data)
+            print(ecdf)
+            KS = self.ks(ecdf, cdf)
+            accept_null_hypothesis = KS.pvalue > 0.05
+            print(KS.pvalue)
+            print(accept_null_hypothesis)
             if not accept_null_hypothesis:
-                return new_centers  # If null hypothesis is rejected then use two new clusters
+                return new_centers, True   # If null hypothesis is rejected then use two new clusters
 
-        return None
+        return points, False
 
-
-    def _is_null_hypothesis(self, data, centers):
-        """!
-        @brief Returns whether H0 hypothesis is accepted using Anderson-Darling test statistic.
-
-        @param[in] data (array_like): N-dimensional data for statistical test.
-        @param[in] centers (array_like): Two new allocated centers.
-
-        @return (bool) True is null hypothesis is acceptable.
-
-        """
-        v = numpy.subtract(centers[0], centers[1])
-        points = self._project_data(data, v)
-
-        estimation, critical, _ = scipy.stats.anderson(points, dist='norm')  # the Anderson-Darling test statistic
-
-        # If the returned statistic is larger than these critical values then for the corresponding significance level,
-        # the null hypothesis that the data come from the chosen distribution can be rejected.
-        return estimation < critical[-1]  # False - not a gaussian distribution (reject H0)
-
+    def ks(self, ecdf, cdf):
+        
+        return scipy.stats.ks_2samp(ecdf, cdf)
 
     @staticmethod
     def _project_data(data, vector):
@@ -315,7 +343,6 @@ class gmeans:
         """
         square_norm = numpy.sum(numpy.multiply(vector, vector))
         return numpy.divide(numpy.sum(numpy.multiply(data, vector), axis=1), square_norm)
-
 
     def _search_optimal_parameters(self, data, amount):
         """!

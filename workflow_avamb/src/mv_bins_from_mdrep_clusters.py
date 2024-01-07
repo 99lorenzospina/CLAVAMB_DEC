@@ -30,6 +30,10 @@ def main(
     write_final_nc_clusters(nc_cluster_scores, cluster_contigs, path_nc_clusters)
 
 
+"""
+Dizionario di clusters con i rispettivi score di
+completezza e contaminazione
+"""
 def get_nc_cluster_scores(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
@@ -49,6 +53,9 @@ def get_nc_cluster_scores(
     return nc_cluster_scores
 
 
+"""
+Ritorna il sample di appartenenza del cluster
+"""
 def get_cluster_sample(
     cluster_contigs: dict[str, set[str]], bin_separator: Optional[str]
 ) -> dict[str, str]:
@@ -62,6 +69,10 @@ def get_cluster_sample(
     return cluster_sample
 
 
+"""
+Crea una cartella per ogni sample ottenuto esaminando
+i clusters
+"""
 def create_nc_sample_folders(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
@@ -80,6 +91,9 @@ def create_nc_sample_folders(
             pass
 
 
+"""
+Sposta i clusters in una nuova cartella
+"""
 def write_nc_bins_from_mdrep_clusters(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
@@ -105,6 +119,9 @@ def write_quality_report(
             file.flush()
 
 
+"""
+Scrive a ogni riga ogni contig+il suo cluster
+"""
 def write_final_nc_clusters(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_contigs: dict[str, set[str]],

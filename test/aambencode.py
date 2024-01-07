@@ -3,10 +3,12 @@ import os
 import numpy as np
 import torch
 import random
+from pyclustering.cluster.gmeans import gmeans
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
 import vamb
+import src
 
 # Test making the dataloader
 tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
@@ -65,8 +67,6 @@ assert np.all(mask == mask2)
 assert np.all(np.mean(tnf, axis=0) < 1e-4) # normalized
 assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
-# Can instantiate the AAE
-aae = vamb.aamb_encode.AAE(103, nsamples=3)
 
 # Training model works in general
 tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
@@ -74,6 +74,20 @@ rpkm = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_r
 lengths = np.ones(tnf.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
+
+estimator = vamb.species_number.gmeans(np.concatenate((tnf, rpkm), axis=1))
+estimator.process()
+nlatent_aae_y = estimator.estimate_k()
+print(nlatent_aae_y)
+
+estimator = gmeans(np.concatenate((tnf, rpkm), axis=1), ccore = True)
+estimator.process()
+nlatent_aae_y = len(estimator.get_clusters())
+print(nlatent_aae_y)
+
+
+# Can instantiate the AAE
+aae = vamb.aamb_encode.AAE(103, nsamples=3, nlatent_y=nlatent_aae_y)
 
 aae.trainmodel(dataloader, batchsteps=[5, 10], nepochs=15)
 aae.trainmodel(dataloader, batchsteps=None, nepochs=15)
