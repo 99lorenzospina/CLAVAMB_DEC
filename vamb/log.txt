@@ -1,0 +1,6 @@
+Starting AVAmb version 1.0.0.DEV
+	Date and time is 2024-01-08 19:53:44.769166
+
+Loading TNF
+	Minimum sequence length: 250
+	Loading composition from npz ../test/data/target_tnf.npz

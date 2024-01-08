@@ -449,7 +449,7 @@ def run(
     minid: float,
     minalignmentscore: float,
     vae_temperature: float,
-    aee_temperature: float,
+    aae_temperature: float,
     nthreads: int,
     nhiddens: Optional[list[int]],
     nhiddens_aae: Optional[list[int]],
@@ -487,14 +487,13 @@ def run(
         log('Starting AVAmb version ' + '.'.join(map(str, vamb.__version__)), logfile)
     log("Date and time is " + str(datetime.datetime.now()), logfile, 1)
     begintime = time.time()/60
-    
     # Get TNFs, save as npz
     composition = calc_tnf(outdir,
                            fastapath,
                            compositionpath,
-                           jgipath,
                            mincontiglength,
                            logfile,
+                           max(nepochs, nepochs_aae),
                            augmode=augmode,
                            augmentation_store_dir=augmentationpath,
                            contrastive=contrastive,
@@ -581,7 +580,7 @@ def run(
             augmode,
             augdatashuffle,
             augmentationpath,
-            aee_temperature,
+            aae_temperature,
             composition.metadata.lengths,
             nhiddens_aae,
             nlatent_aae_z,
@@ -766,7 +765,7 @@ def main():
         title="TNF input (either fasta or all .npz files required)"
     )
     tnfos.add_argument("--fasta", metavar="", help="path to fasta file")
-    tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation')
+    tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
 
     # Contrastive learning arguments
@@ -930,7 +929,7 @@ def main():
     aaeos = parser.add_argument_group(title='AAE options', description=None)
 
     aaeos.add_argument('--n_aae', dest='nhiddens_aae', metavar='', type=int, nargs='+',
-                        default=547, help='hidden neurons AAE [547]')
+                        default=None, help='hidden neurons AAE [547]')
     aaeos.add_argument('--z_aae', dest='nlatent_aae_z', metavar='', type=int,
                         default=283, help='latent neurons AAE continuous latent space  [283]')
     #aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
@@ -945,7 +944,7 @@ def main():
     aaetrainos = parser.add_argument_group(title='Training options AAE', description=None)
 
     aaetrainos.add_argument('--e_aae', dest='nepochs_aae', metavar='', type=int,
-                        default=70, help='epochs AAE [70]')
+                        default=70, help='epochs AAE [70]') #NOT USED
     aaetrainos.add_argument('--t_aae', dest='batchsize_aae', metavar='', type=int,
                         default=256, help='starting batch size AAE [256]')
     aaetrainos.add_argument('--q_aae', dest='batchsteps_aae', metavar='', type=int, nargs='*',
@@ -1023,6 +1022,7 @@ def main():
     minfasta: Optional[int] = args.minfasta
     noencode: bool = args.noencode
     nhiddens: Optional[list[int]] = args.nhiddens
+    
     nlatent: int = args.nlatent
 
     nhiddens_aae: Optional[list[int]] = args.nhiddens_aae
@@ -1044,7 +1044,7 @@ def main():
     batchsize_aae: int = args.batchsize_aae
     batchsteps_aae: list[int] = args.batchsteps_aae
 
-    lrate_vae: float = args.lrate
+    lrate_vae: float = args.lrate_vae
     vae_temperature: float = args.vae_temperature
     
     lrate_aae: float = args.lrate_aae
@@ -1120,7 +1120,9 @@ def main():
         augmentation_data_dir = os.path.join(args.outdir, 'augmentation')
     
     # Make sure only one RPKM input is there
-    if not ((bamfiles is None) ^ (rpkm is None) ^ (jgi is None)):
+    if (bamfiles is not None and rpkm is None and jgi is None) or \
+   (bamfiles is None and rpkm is not None and jgi is None) or \
+   (bamfiles is None and rpkm is None and jgi is not None):
         raise argparse.ArgumentTypeError(
             "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
