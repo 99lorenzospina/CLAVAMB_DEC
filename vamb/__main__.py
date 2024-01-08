@@ -480,7 +480,7 @@ def run(
     logfile: IO[str]
 ):
 
-    contrastive = contrastive_aae | contrastive_vae
+    contrastive = contrastive_aae or contrastive_vae
     if contrastive:
         log('Starting ClAVAmb version ' + '.'.join(map(str, vamb.__version__)), logfile)
     else:
@@ -493,7 +493,7 @@ def run(
                            compositionpath,
                            mincontiglength,
                            logfile,
-                           max(nepochs, nepochs_aae),
+                           nepochs,
                            augmode=augmode,
                            augmentation_store_dir=augmentationpath,
                            contrastive=contrastive,
@@ -1258,10 +1258,14 @@ def main():
             pass
         except:
             raise
-    
+
+
     logpath = os.path.join(outdir, "log.txt")
 
     with open(logpath, "w") as logfile:
+        if args.contrastive_vae and args.contrastive_aae:
+            log('Setting same number of epochs for aae and vae', logfile)
+            nepochs_aae = nepochs
         run(
             outdir,
             fasta,

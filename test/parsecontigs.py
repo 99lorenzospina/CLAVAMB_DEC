@@ -144,7 +144,7 @@ with vamb.vambtools.Reader(bigpath) as f:
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
 
 with open(fasta_path, 'rb') as file:
-    temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=100, store_dir="./data/", backup_iteration = 19, use_pc= True)
+    temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=100, store_dir="./data/", backup_iteration = 18, use_pc= True)
     tnf = temp.matrix
     contignames = temp.metadata.identifiers
     contiglengths = temp.metadata.lengths
