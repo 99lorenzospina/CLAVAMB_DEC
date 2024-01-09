@@ -103,7 +103,7 @@ def calc_tnf(
 
 
 def calc_rpkm(
-    outdir, bampaths, rpkmpath, jgipath, mincontiglength, refhash, ncontigs,
+    outdir, bampaths, rpkmpath, jgipath, refhash, ncontigs, mincontiglength,
               minalignscore, minid, subprocesses, logfile
 ):
     begintime = time.time()
@@ -118,31 +118,30 @@ def calc_rpkm(
     
     else:
         log('Reference hash: {}'.format(refhash if refhash is None else refhash.hex()), logfile, 1)
+        # Else if JGI is given, we load from that
+        if jgipath is not None:
+            log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
+            with open(jgipath) as file:
+                rpkms = vamb.vambtools._load_jgi(file, mincontiglength, refhash)
 
-    # Else if JGI is given, we load from that
-    if jgipath is not None:
-        log('Loading RPKM from JGI file {}'.format(jgipath), logfile, 1)
-        with open(jgipath) as file:
-            rpkms = vamb.vambtools._load_jgi(file, mincontiglength, refhash)
+        else:
+            log('Parsing {} BAM files with {} subprocesses'.format(len(bampaths) if bampaths is not None else 0, subprocesses),
+            logfile, 1)
+            log('Min alignment score: {}'.format(minalignscore), logfile, 1)
+            log('Min identity: {}'.format(minid), logfile, 1)
+            log('Min contig length: {}'.format(mincontiglength), logfile, 1)
+            log('\nOrder of columns is:', logfile, 1)
+            log('\n\t'.join(bampaths), logfile, 1)
+            print('', file=logfile)
 
-    else:
-        log('Parsing {} BAM files with {} subprocesses'.format(len(bampaths) if bampaths is not None else 0, subprocesses),
-           logfile, 1)
-        log('Min alignment score: {}'.format(minalignscore), logfile, 1)
-        log('Min identity: {}'.format(minid), logfile, 1)
-        log('Min contig length: {}'.format(mincontiglength), logfile, 1)
-        log('\nOrder of columns is:', logfile, 1)
-        log('\n\t'.join(bampaths), logfile, 1)
-        print('', file=logfile)
-
-        dumpdirectory = os.path.join(outdir, 'tmp')
-        rpkms = vamb.parsebam.read_bamfiles(bampaths, dumpdirectory=dumpdirectory,
-                                            refhash=refhash, minscore=minalignscore,
-                                            minlength=mincontiglength, minid=minid,
-                                            subprocesses=subprocesses, logfile=logfile)
-        print('', file=logfile)
-        vamb.vambtools.write_npz(os.path.join(outdir, 'rpkm.npz'), rpkms)
-        shutil.rmtree(dumpdirectory)
+            dumpdirectory = os.path.join(outdir, 'tmp')
+            rpkms = vamb.parsebam.read_bamfiles(bampaths, dumpdirectory=dumpdirectory,
+                                                refhash=refhash, minscore=minalignscore,
+                                                minlength=mincontiglength, minid=minid,
+                                                subprocesses=subprocesses, logfile=logfile)
+            print('', file=logfile)
+            vamb.vambtools.write_npz(os.path.join(outdir, 'rpkm.npz'), rpkms)
+            shutil.rmtree(dumpdirectory)
 
     if len(rpkms) != ncontigs:
         raise ValueError("Length of TNFs and length of RPKM does not match. Verify the inputs")
@@ -509,6 +508,7 @@ def run(
         jgipath,
         refhash,
         len(composition.metadata.identifiers),
+        mincontiglength,
         minalignmentscore,
         minid,
         nthreads,
@@ -944,7 +944,7 @@ def main():
     aaetrainos = parser.add_argument_group(title='Training options AAE', description=None)
 
     aaetrainos.add_argument('--e_aae', dest='nepochs_aae', metavar='', type=int,
-                        default=70, help='epochs AAE [70]') #NOT USED
+                        default=70, help='epochs AAE [70]')
     aaetrainos.add_argument('--t_aae', dest='batchsize_aae', metavar='', type=int,
                         default=256, help='starting batch size AAE [256]')
     aaetrainos.add_argument('--q_aae', dest='batchsteps_aae', metavar='', type=int, nargs='*',
@@ -1120,9 +1120,9 @@ def main():
         augmentation_data_dir = os.path.join(args.outdir, 'augmentation')
     
     # Make sure only one RPKM input is there
-    if (bamfiles is not None and rpkm is None and jgi is None) or \
+    if not( (bamfiles is not None and rpkm is None and jgi is None) or \
    (bamfiles is None and rpkm is not None and jgi is None) or \
-   (bamfiles is None and rpkm is None and jgi is not None):
+   (bamfiles is None and rpkm is None and jgi is not None)):
         raise argparse.ArgumentTypeError(
             "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
@@ -1264,6 +1264,8 @@ def main():
 
     with open(logpath, "w") as logfile:
         if args.contrastive_vae and args.contrastive_aae:
+            #because of augmented data generation technique, keeping two values
+            #may create conflicts
             log('Setting same number of epochs for aae and vae', logfile)
             nepochs_aae = nepochs
         run(
