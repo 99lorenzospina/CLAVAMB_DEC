@@ -17,6 +17,7 @@ from argparse import Namespace
 from typing import Optional, IO
 import warnings
 from glob import glob
+import random
 from pyclustering.cluster.gmeans import gmeans
 
 _ncpu = os.cpu_count()
@@ -55,6 +56,7 @@ def calc_tnf(
     augmode = [-1,-1],
     contrastive=True,
     k=4,
+    use_pc=False
 ) -> vamb.parsecontigs.Composition:
     begintime = time.time()/60
     log("\nLoading TNF/PC", logfile, 0)
@@ -66,21 +68,51 @@ def calc_tnf(
         composition.filter_min_length(mincontiglength)
     else:
         assert fastapath is not None
-        log(f"Loading data from FASTA file {fastapath}", logfile, 1)
-        if not contrastive:
-            with vamb.vambtools.Reader(fastapath) as file:
-                composition = vamb.parsecontigs.Composition.from_file(
-                    file, minlength=mincontiglength
-                )
-            composition.save(os.path.join(outdir, "composition.npz"))
+        if isinstance(fastapath, str):
+            log(f"Loading data from FASTA file {fastapath}", logfile, 1)
+            if not contrastive:
+                with vamb.vambtools.Reader(fastapath) as file:
+                    composition = vamb.parsecontigs.Composition.from_file(
+                        file, minlength=mincontiglength, use_pc = use_pc
+                    )
+                composition.save(os.path.join(outdir, "composition.npz"))
+            else:
+                os.system(f'mkdir -p {augmentation_store_dir}')
+                backup_iteration = math.ceil(math.sqrt(nepochs))
+                log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
+                # Put index for each augmented data
+                index_list = list(range(backup_iteration))
+                random.shuffle(index_list)
+                with vamb.vambtools.Reader(fastapath) as file:
+                    composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
+                        file, minlength=mincontiglength, k=k, index_list= index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
+                    file.close()
+                composition.save(os.path.join(outdir, "composition.npz"))
         else:
-            os.system(f'mkdir -p {augmentation_store_dir}')
-            backup_iteration = math.ceil(math.sqrt(nepochs))
-            log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
-            with vamb.vambtools.Reader(fastapath) as file:
-              composition = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=mincontiglength, k=k, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode)
-              file.close()
-              composition.save(os.path.join(outdir, "composition.npz"))
+            print("Loading data from FASTA files {}".format(fastapath), file=logfile)
+            b = True
+            for path in fastapath:
+                if not contrastive:
+                    with vamb.vambtools.Reader(path) as file:
+                        if b:
+                            b = False
+                            composition = None
+                        composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
+                            file, minlength=mincontiglength, use_pc=use_pc
+                        ))
+                    composition.save(os.path.join(outdir, "composition.npz"))
+                if contrastive:
+                    os.system(f'mkdir -p {augmentation_store_dir}')
+                    backup_iteration = math.ceil(math.sqrt(nepochs))
+                    log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
+                    # Put index for each augmented data
+                    index_list = list(range(backup_iteration))
+                    random.shuffle(index_list)
+                    with vamb.vambtools.Reader(fastapath) as file:
+                        composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
+                            file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
+                        file.close()
+                    composition.save(os.path.join(outdir, "composition.npz"))
 
     ''' composition.save should do the trick
     vamb.vambtools.write_npz(os.path.join(outdir, 'tnf.npz'), tnfs)
@@ -476,6 +508,7 @@ def run(
     maxclusters: Optional[int],
     minfasta: Optional[int],
     model_selection: str,
+    use_pc: bool,
     logfile: IO[str]
 ):
 
@@ -496,7 +529,8 @@ def run(
                            augmode=augmode,
                            augmentation_store_dir=augmentationpath,
                            contrastive=contrastive,
-                           k=k)
+                           k=k,
+                           use_pc = use_pc)
     
     
     # Parse BAMs, save as npz
@@ -777,6 +811,7 @@ def main():
     tnfos.add_argument("--fasta", metavar="", help="path to fasta file")
     tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
+    tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers instead of tnf [False]')
 
     # Contrastive learning arguments
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
@@ -1325,6 +1360,7 @@ def main():
             maxclusters=maxclusters,
             minfasta=minfasta,
             model_selection=args.model,
+            use_pc = args.use_pc,
             logfile=logfile,
         )
 
