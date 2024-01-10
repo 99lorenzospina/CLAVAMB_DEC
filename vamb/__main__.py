@@ -68,6 +68,12 @@ def calc_tnf(
         composition.filter_min_length(mincontiglength)
     else:
         assert fastapath is not None
+        if contrastive:
+            index_list_one = list(range(backup_iteration))
+            random.shuffle(index_list_one)
+            index_list_two = list(range(backup_iteration))
+            random.shuffle(index_list_two)
+            index_list = [index_list_one, index_list_two]
         if isinstance(fastapath, str):
             log(f"Loading data from FASTA file {fastapath}", logfile, 1)
             if not contrastive:
@@ -80,14 +86,12 @@ def calc_tnf(
                 os.system(f'mkdir -p {augmentation_store_dir}')
                 backup_iteration = math.ceil(math.sqrt(nepochs))
                 log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
-                # Put index for each augmented data
-                index_list = list(range(backup_iteration))
-                random.shuffle(index_list)
                 with vamb.vambtools.Reader(fastapath) as file:
                     composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
-                        file, minlength=mincontiglength, k=k, index_list= index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
+                        file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
                     file.close()
                 composition.save(os.path.join(outdir, "composition.npz"))
+        #multiple files in input (multiple datasets)
         else:
             print("Loading data from FASTA files {}".format(fastapath), file=logfile)
             b = True
@@ -99,20 +103,24 @@ def calc_tnf(
                             composition = None
                         composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
                             file, minlength=mincontiglength, use_pc=use_pc
-                        ))
-                    composition.save(os.path.join(outdir, "composition.npz"))
+                        ))    
                 if contrastive:
                     os.system(f'mkdir -p {augmentation_store_dir}')
                     backup_iteration = math.ceil(math.sqrt(nepochs))
                     log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
-                    # Put index for each augmented data
-                    index_list = list(range(backup_iteration))
-                    random.shuffle(index_list)
                     with vamb.vambtools.Reader(fastapath) as file:
+                        #Generate the composition for this path and update the overall augmentation files
                         composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
-                            file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
+                            file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, already = not b)
+                        if b:
+                            b = False
+                            composition = None
+                        #Update the overall composition
+                        composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
+                            file, minlength=mincontiglength, use_pc=use_pc
+                        ))
                         file.close()
-                    composition.save(os.path.join(outdir, "composition.npz"))
+            composition.save(os.path.join(outdir, "composition.npz"))
 
     ''' composition.save should do the trick
     vamb.vambtools.write_npz(os.path.join(outdir, 'tnf.npz'), tnfs)
@@ -142,11 +150,24 @@ def calc_rpkm(
     log('\nLoading RPKM', logfile)
     # If rpkm is given, we load directly from .npz file
     if rpkmpath is not None:
-        log('Loading RPKM from npz array {}'.format(rpkmpath), logfile, 1)
-        rpkms = vamb.vambtools.read_npz(rpkmpath)
+        if isinstance(rpkmpath, str):
+            log('Loading RPKM from npz array {}'.format(rpkmpath), logfile, 1)
+            rpkms = vamb.vambtools.read_npz(rpkmpath)
 
-        if not rpkms.dtype == np.float32:
-            raise ValueError('RPKMs .npz array must be of float32 dtype')
+            if not rpkms.dtype == np.float32:
+                raise ValueError('RPKMs .npz array must be of float32 dtype')
+        #multiple files in input (multiple datasets)
+        else:
+            print("Loading data from FASTA files {}".format(rpkmpath), file=logfile)
+            old = []
+            for path in rpkmpath:
+                log('Loading RPKM from npz array {}'.format(path), logfile, 1)
+                rpkms = vamb.vambtools.read_npz(path)
+                rpkms = np.concatenate(old, rpkms)
+                old = rpkms
+                if not rpkms.dtype == np.float32:
+                    raise ValueError('RPKMs .npz array must be of float32 dtype')
+            del old
     
     else:
         log('Reference hash: {}'.format(refhash if refhash is None else refhash.hex()), logfile, 1)
