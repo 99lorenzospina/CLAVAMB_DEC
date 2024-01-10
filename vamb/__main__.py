@@ -57,7 +57,7 @@ def calc_tnf(
     k=4,
 ) -> vamb.parsecontigs.Composition:
     begintime = time.time()/60
-    log("\nLoading TNF", logfile, 0)
+    log("\nLoading TNF/PC", logfile, 0)
     log(f"Minimum sequence length: {mincontiglength}", logfile, 1)
 
     if npzpath is not None:
@@ -454,7 +454,7 @@ def run(
     nhiddens_aae: Optional[list[int]],
     nlatent: int,
     nlatent_aae_z: int,
-    #nlatent_aae_y: int,
+    nlatent_aae_y: int,
     nepochs: int,
     nepochs_aae: int,
     batchsize: int,
@@ -514,9 +514,18 @@ def run(
         nthreads,
         logfile,
     )
+
+    '''np.savez_compressed(os.path.join(outdir, "rpkm.npz"),
+                        matrix=abundance,
+                        samplenames=composition.samplenames,
+                        minid=minid,
+                        refhash=refhash)'''
+
     timepoint_gernerate_input=time.time()/60
     time_generating_input= round(timepoint_gernerate_input-begintime,2)
-   
+
+    assert len(abundance) == len(composition.matrix)
+
     if noencode:
         elapsed = round(time.time()/60 - begintime, 2)
         log(
@@ -524,18 +533,19 @@ def run(
             logfile,
         )
         return None
-    log(f"\nTNF and coabundances generated in {time_generating_input}", logfile, 1)
+    log(f"\nTNF and coabundances generated in {time_generating_input} minutes", logfile, 1)
 
     # Estimate the number of clusters
-    log("Estimate the number of clusters")
-    begintime = time.time()/60
-    estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
-    estimator.process()
-    nlatent_aae_y = len(estimator.get_clusters())
-    timepoint_gernerate_input=time.time()/60
-    time_generating_input= round(timepoint_gernerate_input-begintime,2)
-    log(f"\nCluster estimated in {time_generating_input}", logfile, 1)
-    log(f"\Estimated {nlatent_aae_y} clusters", logfile, 1)
+    if nlatent_aae_y == None:
+        log(f"\nEstimate the number of clusters", logfile, 1)
+        begintime = time.time()/60
+        estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
+        estimator.process()
+        nlatent_aae_y = len(estimator.get_clusters())
+        timepoint_gernerate_input=time.time()/60
+        time_generating_input= round(timepoint_gernerate_input-begintime,2)
+        log(f"\nCluster estimated in {time_generating_input}", logfile, 1)
+        log(f"\nEstimated {nlatent_aae_y} clusters", logfile, 1)
 
     #Training phase
     if 'vae' in model_selection:
@@ -932,8 +942,8 @@ def main():
                         default=None, help='hidden neurons AAE [547]')
     aaeos.add_argument('--z_aae', dest='nlatent_aae_z', metavar='', type=int,
                         default=283, help='latent neurons AAE continuous latent space  [283]')
-    #aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
-    #                    default=700, help='latent neurons AAE categorical latent space [700]')
+    aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
+                        default=None, help='latent neurons AAE categorical latent space [None]. If None, and estimation will be computed')
     aaeos.add_argument('--sl_aae', dest='sl', metavar='', type=float,
                         default=0.00964, help='loss scale between reconstruction loss and adversarial losses [0.00964] ')
     aaeos.add_argument('--slr_aae', dest='slr', metavar='', type=float,
@@ -1027,7 +1037,7 @@ def main():
 
     nhiddens_aae: Optional[list[int]] = args.nhiddens_aae
     nlatent_aae_z: int = args.nlatent_aae_z
-    #nlatent_aae_y: int = args.nlatent_aae_y
+    nlatent_aae_y: int = args.nlatent_aae_y
 
 
     alpha: Optional[float] = args.alpha
@@ -1293,7 +1303,7 @@ def main():
             nhiddens_aae=nhiddens_aae,
             nlatent=nlatent,
             nlatent_aae_z=nlatent_aae_z,
-            #nlatent_aae_y=nlatent_aae_y,
+            nlatent_aae_y=nlatent_aae_y,
             nepochs=nepochs,
             nepochs_aae=nepochs_aae,
             batchsize=batchsize,

@@ -119,7 +119,7 @@ def calc_rpkm(
     # If rpkm is given, we load directly from .npz file
     if npzpath is not None:
         log(f"Loading depths from npz array {npzpath}", logfile, 1)
-        abundance = vamb.parsebam.Abundance.load(
+        abundance = vamb.parsebam_meh.Abundance.load(
             npzpath, comp_metadata.refhash if verify_refhash else None
         )
         # I don't want this check in any constructors of abundance, since the constructors
