@@ -81,7 +81,7 @@ def calc_tnf(
                     composition = vamb.parsecontigs.Composition.from_file(
                         file, minlength=mincontiglength, use_pc = use_pc
                     )
-                composition.save(os.path.join(outdir, "composition.npz"))
+                    file.close()
             else:
                 os.system(f'mkdir -p {augmentation_store_dir}')
                 backup_iteration = math.ceil(math.sqrt(nepochs))
@@ -90,7 +90,7 @@ def calc_tnf(
                     composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
                         file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
                     file.close()
-                composition.save(os.path.join(outdir, "composition.npz"))
+            composition.save(os.path.join(outdir, "composition.npz"))
         #multiple files in input (multiple datasets)
         else:
             print("Loading data from FASTA files {}".format(fastapath), file=logfile)
@@ -103,22 +103,22 @@ def calc_tnf(
                             composition = None
                         composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
                             file, minlength=mincontiglength, use_pc=use_pc
-                        ))    
+                        ))
+                        file.close()    
                 if contrastive:
                     os.system(f'mkdir -p {augmentation_store_dir}')
                     backup_iteration = math.ceil(math.sqrt(nepochs))
                     log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
                     with vamb.vambtools.Reader(fastapath) as file:
                         #Generate the composition for this path and update the overall augmentation files
-                        composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
+                        newcomp = vamb.parsecontigs.Composition.read_contigs_augmentation(
                             file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, already = not b)
                         if b:
                             b = False
                             composition = None
                         #Update the overall composition
-                        composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
-                            file, minlength=mincontiglength, use_pc=use_pc
-                        ))
+                        composition = vamb.parsecontigs.Composition.concatenate(composition, newcomp
+                        )
                         file.close()
             composition.save(os.path.join(outdir, "composition.npz"))
 
@@ -829,7 +829,7 @@ def main():
     tnfos = parser.add_argument_group(
         title="TNF input (either fasta or all .npz files required)"
     )
-    tnfos.add_argument("--fasta", metavar="", help="path to fasta file")
+    tnfos.add_argument("--fasta", metavar="", help="path to fasta file or paths to fasta files")
     tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
     tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers instead of tnf [False]')
@@ -852,7 +852,7 @@ def main():
     rpkmos.add_argument(
         "--bamfiles", metavar="", help="paths to (multiple) BAM files", nargs="+"
     )
-    rpkmos.add_argument("--rpkm", metavar="", help="path to .npz of RPKM (abundances)")
+    rpkmos.add_argument("--rpkm", metavar="", help="path or paths to .npz of RPKM (abundances)")
     rpkmos.add_argument('--jgi', metavar='', help='path to output of jgi_summarize_bam_contig_depths')
 
     # Optional arguments
@@ -1069,7 +1069,7 @@ def main():
     args = parser.parse_args()
 
     outdir: str = os.path.abspath(args.outdir)
-    fasta: Optional[str] = args.fasta
+    fasta: Optional[list[str]] = args.fasta
     jgi: Optional[str] = args.jgi
     composition: Optional[str] = args.composition
     bamfiles: Optional[list[str]] = args.bamfiles
@@ -1143,8 +1143,14 @@ def main():
         )
 
     for path in (fasta, composition):
-        if path is not None and not os.path.isfile(path):
-            raise FileNotFoundError(path)
+        if path is not None:
+            if fasta is not None and not isinstance(fasta, str):    #if fasta has more paths, check all of them
+                for p in fasta:
+                    if not os.path.isfile(p):
+                        raise FileNotFoundError(p)
+            else:
+                if not os.path.isfile(path):
+                    raise FileNotFoundError(path)
 
     # Check the running mode (CLMB or VAMB)
     if contrastive:
@@ -1193,8 +1199,13 @@ def main():
             "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
 
-    if rpkm is not None and not os.path.isfile(rpkm):
-        raise FileNotFoundError("Not an existing non-directory file: " + rpkm)
+    if rpkm is not None:
+        if isinstance(rpkm, str) and not os.path.isfile(rpkm):
+            raise FileNotFoundError("Not an existing non-directory file: " + rpkm)
+        else:
+            for r in rpkm:
+                if not os.path.isfile(r):
+                    raise FileNotFoundError("Not an existing non-directory file: " + r)
 
     if bamfiles is not None:
         for bampath in bamfiles:

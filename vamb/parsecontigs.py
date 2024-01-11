@@ -138,7 +138,9 @@ class Composition:
             return cls(metadata, _vambtools.validate_input_array(arrs["matrix"]))
         
         # Altrimenti, se ci sono più percorsi, li concateniamo
-        matrices, identifiers, lengths, masks, item = [], [], [], [], []
+        matrices, identifiers, lengths, masks = [], [], [], []
+        item = 0
+        old = 0
 
         for file_path in io:
             data = _np.load(file_path)
@@ -146,19 +148,20 @@ class Composition:
             identifiers.append(data['identifiers'])
             lengths.append(data['length'])
             masks.append(data['mask'])
-            item.append(data['minlength'])
+            item = data['minlength']
 
         # Concateniamo lungo l'asse delle colonne
         concatenated_matrix = _np.concatenate(matrices)
         concatenated_identifiers = _np.concatenate(identifiers)
         concatenated_lengths = _np.concatenate(lengths)
         concatenated_masks = _np.concatenate(masks)
-        concatenated_item = _np.concatenate(item)
+        item = min(old, item)
+        old = item
         metadata = CompositionMetaData(
                     _vambtools.validate_input_array(concatenated_identifiers),
                     _vambtools.validate_input_array(concatenated_lengths),
                     _vambtools.validate_input_array(concatenated_masks),
-                    concatenated_item.item(),
+                    item,
                     )
 
         return cls(metadata, _vambtools.validate_input_array(concatenated_matrix))
@@ -206,12 +209,12 @@ class Composition:
         concatenated_identifiers = _np.concatenate([first.metadata.identifiers, second.metadata.identifiers])
         concatenated_lengths = _np.concatenate([first.metadata.lengths, second.metadata.lengths])
         concatenated_masks = _np.concatenate([first.metadata.mask, second.metadata.mask])
-        concatenated_lengths = _np.concatenate([first.metadata.minlength, second.metadata.minlength])
+        minlength = min(first.metadata.minlength, second.metadata.minlength)
         metadata = CompositionMetaData(
                     _vambtools.validate_input_array(concatenated_identifiers),
-                    _vambtools.validate_input_array(concatenated_lengths),
-                    _vambtools.validate_input_array(concatenated_masks),
-                    concatenated_lengths.item(),
+                    _vambtools.validate_input_array(_np.array(concatenated_lengths)),
+                    _vambtools.validate_input_array(_np.array(concatenated_masks)),
+                    minlength,
                     )
         return cls(metadata, _vambtools.validate_input_array(concatenated_data))
 
@@ -239,7 +242,6 @@ class Composition:
         for entry in entries: #entry is a single contig taken by the FASTA file
             skip = len(entry) < minlength
             mask.append(not skip)
-
             if skip:
                 continue
 
@@ -266,7 +268,6 @@ class Composition:
         if use_pc:
             tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer
             tnfs_arr.shape = (len(lengths_arr), len(tnfs_arr) // len(lengths_arr))
-
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
             lengths_arr,
@@ -302,6 +303,7 @@ class Composition:
 
         norm = _vambtools.PushArray(_np.float32)
         pc = _vambtools.PushArray(_np.float32)
+        projected = _vambtools.PushArray(_np.float32)
         gaussian = _vambtools.PushArray(_np.float32)
         trans = _vambtools.PushArray(_np.float32)
         traver = _vambtools.PushArray(_np.float32)
@@ -387,6 +389,8 @@ class Composition:
                     #print(t)
                     if i == 0 and i2 == 0:
                         norm.extend(t)
+                        #if len(norm) > 256000:
+                        #    Composition._convert(norm, projected)
                         pc.extend(q)
 
                     for j in range(gaussian_count[i]):
@@ -500,7 +504,7 @@ class Composition:
 
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
-                    filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][i][index]}_Transition_{j2}.npz"
+                    filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Transition_{j2}.npz"
                     if not use_pc:
                         trans_save.shape = (-1, 4**k)
                         if already:
@@ -567,7 +571,8 @@ class Composition:
 
         lengths_arr = lengths.take()
         if not use_pc:
-            norm_arr = norm.take()
+            #Composition._convert(norm, projected)
+            norm_arr = norm.take()  #projected.take
             norm_arr.shape = (-1, 4**k)
 
             norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)

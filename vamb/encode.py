@@ -354,7 +354,7 @@ class VAE(_nn.Module):
         tnf_out: Tensor,
         mu: Tensor,
         logsigma: Tensor,
-        weights: Tensor,
+        weights: Tensor = None,
     ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         # If multiple samples, use cross entropy, else use SSE for abundance
         if self.nsamples > 1:
@@ -371,7 +371,10 @@ class VAE(_nn.Module):
         kld_weight = 1 / (self.nlatent * self.beta)
         reconstruction_loss = ce * ce_weight + sse * sse_weight
         kld_loss = kld * kld_weight
-        loss = (reconstruction_loss + kld_loss)*weights
+        if weights!=None:
+            loss = (reconstruction_loss + kld_loss)*weights
+        else:
+            loss = (reconstruction_loss + kld_loss)
 
         return loss.mean(), ce.mean(), sse.mean(), kld.mean()
 
@@ -795,9 +798,9 @@ class VAE(_nn.Module):
 
                 '''Avoid training 2 same augmentation data'''
                 aug_tensor1, aug_tensor2 = 0, 0
-                print("epoca: ", epoch)
+                #print("epoca: ", epoch)
                 while(_torch.sum(_torch.sub(aug_tensor1, aug_tensor2))==0):
-                    print(aug_archive1_file[0], " and ", aug_archive2_file[0])
+                    #print(aug_archive1_file[0], " and ", aug_archive2_file[0])
                     aug_arr1, aug_arr2 = _vambtools.read_npz(aug_archive1_file[0]), _vambtools.read_npz(aug_archive2_file[0])
                     '''Mutate rpkm and tnf array in-place instead of making a copy.'''
                     aug_arr1 = _vambtools.numpy_inplace_maskarray(aug_arr1, mask)

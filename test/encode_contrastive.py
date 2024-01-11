@@ -68,15 +68,14 @@ assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
 # Training model works in general
 
-with open(os.path.join(parentdir, 'test', 'data', 'fasta.fna'), 'rb') as file:
-    temp = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc=True)
-    tnf = temp.matrix
-    contignames = temp.metadata.identifiers
-    contiglengths = temp.metadata.lengths
+temp = vamb.parsecontigs.Composition.load('./data/joined_composition.npz')
+tnf = temp.matrix
+contignames = temp.metadata.identifiers
+contiglengths = temp.metadata.lengths
 rpkm = np.ones((contiglengths.shape[0],3), dtype=np.float32)
 lengths = np.ones(contiglengths.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
-dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=2)
+dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
 
 # Can instantiate the VAE
 vae = vamb.encode.VAE(ntnf = int(tnf.shape[1]), nsamples=3, c=True)

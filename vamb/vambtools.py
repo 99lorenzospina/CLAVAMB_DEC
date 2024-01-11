@@ -193,6 +193,9 @@ class Reader:
 
     def __iter__(self):
         return self.filehandle
+    
+    def seek(self, offset=0, whence = 0):
+        return self.filehandle.seek(offset, whence)
 
 
 class FastaEntry:

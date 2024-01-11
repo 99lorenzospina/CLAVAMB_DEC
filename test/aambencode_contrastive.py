@@ -68,11 +68,13 @@ assert np.all(np.abs(np.sum(rpkm, axis=1) - 1) < 1e-5) # normalized
 
 # Training model works in general
 
-with open(os.path.join(parentdir, 'test', 'data', 'fasta.fna'), 'rb') as file:
-    temp = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc=True)
-    tnf = temp.matrix
-    contignames = temp.metadata.identifiers
-    contiglengths = temp.metadata.lengths
+temp = vamb.parsecontigs.Composition.load('./data/joined_composition.npz')
+tnf = temp.matrix
+contignames = temp.metadata.identifiers
+contiglengths = temp.metadata.lengths
+print("tnf length: ", tnf.shape)
+print("contignames length: ", contignames.shape)
+print("contiglengths length: ", contiglengths.shape)
 rpkm = np.ones((contiglengths.shape[0],3), dtype=np.float32)
 lengths = np.ones(contiglengths.shape[0])
 lengths = np.exp((lengths + 5.0).astype(np.float32))
@@ -91,7 +93,7 @@ hparams = Namespace(
         augdatashuffle = False     # Shuffle the augmented data for training to introduce more noise. Setting True is not recommended. [False]
     )
 
-f = open('./data/test_log_aamb_contrastive_pc.txt', 'w')
+f = open('./data/test_log_aamb_contrastive.txt', 'w')
 aae.trainmodel(dataloader, batchsteps=[5, 10], logfile= f, nepochs=15, hparams=hparams, augmentationpath="./data/", mask=mask)
 aae.trainmodel(dataloader, batchsteps=None, nepochs=15, hparams=hparams, augmentationpath="./data/", mask=mask)
 

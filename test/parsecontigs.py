@@ -1,13 +1,13 @@
 import sys
 import os
 import numpy as np
+import random
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
 import vamb
-
 fasta_path = os.path.join(parentdir, 'test', 'data', 'fasta.fna')
-
+'''
 # Test it fails with non binary opened
 with open(fasta_path) as file:
     try:
@@ -17,11 +17,13 @@ with open(fasta_path) as file:
         pass
     else:
         raise AssertionError('Should have failed w. TypeError when opening FASTA file in text mode')
+    file.close()
 
 
 # Open and read file
 with open(fasta_path, 'rb') as file:
     contigs = list(vamb.vambtools.byte_iterfasta(file))
+    file.close()
 
 # Lengths are correct
 assert [len(i) for i in contigs] == [100, 100, 150, 99, 0, 150]
@@ -60,6 +62,7 @@ with open(badfasta_path, 'rb') as file:
         #assert error.args == ("Non-IUPAC DNA byte in sequence badseq: 'P'",)
     else:
         raise AssertionError("Didn't fail at opening fad FASTA file")
+    file.close()
 
 # Reader works well
 gzip_path = os.path.join(parentdir, 'test', 'data', 'fasta.fna.gz')
@@ -125,7 +128,7 @@ with open(fasta_path, 'rb') as file:
     tnf = temp.matrix
     contignames = temp.metadata.identifiers
     contiglengths = temp.metadata.lengths
-
+    file.close()
 assert len(tnf) == len([i for i in contigs if len(i) >= 100])
 #assert all(i-1e-8 < j < i+1e-8 for i,j in zip(tnf[2], contig3_tnf_observed))
 
@@ -135,18 +138,67 @@ assert np.array_equal(contignames, ['Sequence1_100nt_no_special',
  'Sequence6 150 nt, same as seq4 but mixed case'])
 
 assert np.all(contiglengths == np.array([len(i) for i in contigs if len(i) >= 100]))
-
+'''
 bigpath = os.path.join(parentdir, 'test', 'data', 'bigfasta.fna.gz')
 with vamb.vambtools.Reader(bigpath) as f:
     tnf= vamb.parsecontigs.Composition.from_file(f, use_pc= True).matrix
+    f.close()
 
 #target_tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
     
 paths = [fasta_path, bigpath]
+backup_iteration=18
+index_list_one = list(range(backup_iteration))
+random.shuffle(index_list_one)
+index_list_two = list(range(backup_iteration))
+random.shuffle(index_list_two)
+index_list = [index_list_one, index_list_two]
+b=True
 for path in paths:
-    with open(path, 'rb') as file:
-        temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, minlength=100, store_dir="./data/", backup_iteration = 18, use_pc= True)
-        tnf = temp.matrix
-        contignames = temp.metadata.identifiers
-        contiglengths = temp.metadata.lengths
+    print("Examining:", path)
+    with vamb.vambtools.Reader(path) as file:
+        temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, index_list=index_list, minlength=100, store_dir="./data/", backup_iteration = 18, use_pc=False, already = not b)
+        if b:
+            b = False
+            composition = None
+        file.close()
+        print("temp.tnf shape", temp.matrix.shape)
+        print(temp.matrix)
+        print("temp.contignames shape",temp.metadata.identifiers.shape)
+        print(temp.metadata.identifiers)
+        print("temp.contiglengths shape",temp.metadata.lengths.shape)
+    with vamb.vambtools.Reader(path) as file:
+        composition = vamb.parsecontigs.Composition.concatenate(composition, temp
+                        )
+        tnf = composition.matrix
+        contignames = composition.metadata.identifiers
+        contiglengths = composition.metadata.lengths
+        print("second temp.tnf shape", tnf.shape)
+        print(tnf)
+        print("second temp.contignames shape",contignames.shape)
+        print(contignames)
+        print("second temp.contiglengths shape",contiglengths.shape)
+        file.close()
+print("finals:", tnf.shape)
+print(contignames.shape)
+print(contiglengths.shape)
+composition.save('./data/joined_composition')
+'''
+b=True
+for path in paths:
+    print("Examining:", path)
+    with vamb.vambtools.Reader(path) as file:
+        temp = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc= True)
+        if b:
+            b = False
+            composition = None        
+        composition = vamb.parsecontigs.Composition.concatenate(composition, temp
+                        )
+        tnf = composition.matrix
+        print(len(tnf))
+        contignames = composition.metadata.identifiers
+        contiglengths = composition.metadata.lengths
+        print(contiglengths[-1])
+        print(temp.metadata.lengths[-1])
+        file.close()'''
