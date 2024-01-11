@@ -159,7 +159,7 @@ def calc_rpkm(
         #multiple files in input (multiple datasets)
         else:
             print("Loading data from FASTA files {}".format(rpkmpath), file=logfile)
-            old = []
+            old = np.array([])
             for path in rpkmpath:
                 log('Loading RPKM from npz array {}'.format(path), logfile, 1)
                 rpkms = vamb.vambtools.read_npz(path)
