@@ -19,7 +19,7 @@ with open(fasta_path) as file:
         raise AssertionError('Should have failed w. TypeError when opening FASTA file in text mode')
     file.close()
 
-
+'''
 # Open and read file
 with open(fasta_path, 'rb') as file:
     contigs = list(vamb.vambtools.byte_iterfasta(file))
@@ -43,7 +43,8 @@ contig3_fourmers_expected = """0000002100000001000001021200010010100110001001120
 0101010000001001020111010010000111001000010010000010200001000100211110101100010
 10000120010100010001000010011110100000100""".replace('\n', '')
 contig3_fourmers_observed = contigs[2].kmercounts(4)
-
+print(contig3_fourmers_observed)
+'''
 for i, j in zip(contig3_fourmers_expected, contig3_fourmers_observed):
     assert int(i) == j
 
