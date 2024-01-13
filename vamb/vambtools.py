@@ -580,7 +580,7 @@ def read_npz(file) -> _np.ndarray:
     """
 
     npz = _np.load(file)
-    array = validate_input_array(npz["arr_0"])
+    array = validate_input_array(npz['arr_0'])
     npz.close()
 
     return array
