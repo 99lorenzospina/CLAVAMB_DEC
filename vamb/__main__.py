@@ -594,7 +594,8 @@ def run(
     if nlatent_aae_y == None:
         log(f"\nEstimate the number of clusters", logfile, 1)
         begintime = time.time()/60
-        estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
+        #estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
+        estimator = gmeans(abundance)
         estimator.process()
         nlatent_aae_y = len(estimator.get_clusters())
         timepoint_gernerate_input=time.time()/60
@@ -1200,8 +1201,9 @@ def main():
         )
 
     if rpkm is not None:
-        if isinstance(rpkm, str) and not os.path.isfile(rpkm):
-            raise FileNotFoundError("Not an existing non-directory file: " + rpkm)
+        if isinstance(rpkm, str):
+            if not os.path.isfile(rpkm):
+                raise FileNotFoundError("Not an existing non-directory file: " + rpkm)
         else:
             for r in rpkm:
                 if not os.path.isfile(r):
