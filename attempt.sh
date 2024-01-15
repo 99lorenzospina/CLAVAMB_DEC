@@ -10,4 +10,4 @@ cd /nfsd/bcb/bcbg/spina/
 source tesi_env/bin/activate
 cd CLAVAMB/test
 
-srun python3 parsebam.py 
+srun singularity exec --nv ./my-python-app.sif python3 parsebam.py 
