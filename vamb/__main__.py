@@ -18,7 +18,6 @@ from typing import Optional, IO
 import warnings
 from glob import glob
 import random
-from pyclustering.cluster.gmeans import gmeans
 
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
@@ -595,7 +594,7 @@ def run(
         log(f"\nEstimate the number of clusters", logfile, 1)
         begintime = time.time()/60
         #estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
-        estimator = gmeans(abundance)
+        estimator = vamb.species_number.gmeans(abundance)
         estimator.process()
         nlatent_aae_y = len(estimator.get_clusters())
         timepoint_gernerate_input=time.time()/60

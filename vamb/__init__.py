@@ -41,4 +41,5 @@ from . import benchmark
 from . import encode
 from . import mimics
 from . import aamb_encode
+from . import species_number
 from . import _vambtools

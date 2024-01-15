@@ -38,7 +38,7 @@ rpkm = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'abundanc
 lengths = composition.metadata.lengths
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
 
-estimator = gmeans(np.concatenate((tnf, rpkm), axis=1), ccore = False)
+estimator = vamb.species_number.gmeans(np.concatenate((tnf, rpkm), axis=1), ccore = False)
 estimator.process()
 nlatent_aae_y = len(estimator.get_definitive_centers())
 print(nlatent_aae_y)    #3502 (airways, tnf+abundance), 2267 (airways, pc+abundance)
