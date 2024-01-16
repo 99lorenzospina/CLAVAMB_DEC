@@ -4,8 +4,6 @@ import pysam
 import numpy as np
 import shutil
 
-print(sys.version)
-
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 sys.path.append(parentdir)
