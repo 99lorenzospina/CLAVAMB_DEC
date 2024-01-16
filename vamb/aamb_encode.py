@@ -36,7 +36,7 @@ class AAE(nn.Module):
         self,
         ntnf: int, #103
         nsamples: int,
-        nhiddens: int = 547, #but it should be a list!
+        nhiddens: int = 547,
         nlatent_l: int = 32,
         nlatent_y: int = 100, #careful: nlatent_y should be the number of extimated clusters
         sl: float = 0.00964,
@@ -45,6 +45,11 @@ class AAE(nn.Module):
         _cuda: bool = False,
         k: int = 4,
         contrast: bool = False,
+        optimizer_E = None,
+        optimizer_D = None,
+        optimizer_D_y = None,
+        optimizer_D_z = None,
+        optimizer_awl = None
     ):
         if nsamples is None:
             raise ValueError(
@@ -75,6 +80,11 @@ class AAE(nn.Module):
         self.alpha = alpha
         self.usecuda = _cuda
         self.contrast = contrast
+        self.optimizer_E = optimizer_E
+        self.optimizer_D = optimizer_D
+        self.optimizer_D_y = optimizer_D_y
+        self.optimizer_D_z = optimizer_D_z
+        self.optimizer_awl = optimizer_awl
 
         # encoder
         self.encoder = nn.Sequential(
@@ -208,12 +218,35 @@ class AAE(nn.Module):
       sl = dictionary['sl']
       slr = dictionary['slr']
       try:
-            k = dictionary["k"]
+            k = dictionary['k']
       except KeyError:
             k = 4
+      try:
+            optimizer_E = dictionary["optimizer_E"]
+      except KeyError:
+            optimizer_E = None
+      try:
+            optimizer_D = dictionary["optimizer_D"]
+      except KeyError:
+            optimizer_D = None
+      try:
+            optimizer_D_z = dictionary["optimizer_D_z"]
+      except KeyError:
+            optimizer_D_z = None
+      try:
+            optimizer_D_y = dictionary["optimizer_D_y"]
+      except KeyError:
+            optimizer_D_y = None
+      try:
+            optimizer_awl = dictionary["optimizer_awl"]
+      except KeyError:
+            optimizer_awl = None
+
+
       state = dictionary['state']
 
-      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, k=k, contrast=c)
+      aae = cls(ntnf, nsamples, nhiddens, nlatent_l, nlatent_y, alpha, sl, slr, cuda, k=k, contrast=c, optimizer_E=optimizer_E,
+                optimizer_D=optimizer_D, optimizer_D_z=optimizer_D_z, optimizer_D_y=optimizer_D_y, optimizer_awl=optimizer_awl)
       aae.load_state_dict(state)
 
       if cuda:
@@ -239,6 +272,11 @@ class AAE(nn.Module):
                  'sl' : self.sl,
                  'slr': self.slr,
                  'k' : self.k,
+                 "optimizer_E": self.optimizer_E.state_dict(),
+                 "optimizer_D": self.optimizer_D.state_dict(),
+                 "optimizer_D_z": self.optimizer_D_z.state_dict(),
+                 "optimizer_D_y": self.optimizer_D_y.state_dict(),
+                 **({"optimizer_awl": self.optimizer_awl.state_dict()} if self.optimizer_awl is not None else {}),
                  'state': self.state_dict(),
                 }
 
@@ -271,7 +309,7 @@ class AAE(nn.Module):
     #  Training
     # ----------
 
-    def trainepoch(self, epoch_i, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl=None, optimizer_awl=None):
+    def trainepoch(self, epoch_i, data_loader, logfile, hparams, Tensor, T, adversarial_loss, awl=None):
         self.train()
         (
             ED_loss_e,
@@ -331,8 +369,8 @@ class AAE(nn.Module):
                     depths_in = depths_in.cuda()
                     tnfs_in = tnfs_in.cuda()
 
-                optimizer_E.zero_grad()
-                optimizer_D.zero_grad()
+                self.optimizer_E.zero_grad()
+                self.optimizer_D.zero_grad()
 
                 (
                   mu,
@@ -363,14 +401,14 @@ class AAE(nn.Module):
                 )
 
                 ed_loss.backward()
-                optimizer_E.step()
-                optimizer_D.step()
+                self.optimizer_E.step()
+                self.optimizer_D.step()
 
                 # ----------------------
                 #  Train Discriminator z
                 # ----------------------
 
-                optimizer_D_z.zero_grad()
+                self.optimizer_D_z.zero_grad()
                 mu, logvar = self._encode(depths_in, tnfs_in)[:2]
                 z_latent = self._reparameterization(mu, logvar)
 
@@ -383,13 +421,13 @@ class AAE(nn.Module):
                 d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
 
                 d_z_loss.backward()
-                optimizer_D_z.step()
+                self.optimizer_D_z.step()
 
                 # ----------------------
                 #  Train Discriminator y
                 # ----------------------
 
-                optimizer_D_y.zero_grad()
+                self.optimizer_D_y.zero_grad()
                 y_latent = self._encode(depths_in, tnfs_in)[2]
                 d_y_loss_prior = adversarial_loss(
                     self._discriminator_y(y_prior), labels_prior
@@ -400,7 +438,7 @@ class AAE(nn.Module):
                 d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
 
                 d_y_loss.backward()
-                optimizer_D_y.step()
+                self.optimizer_D_y.step()
 
                 ED_loss_e += float(ed_loss.item())
                 V_loss_e += float(vae_loss.item())
@@ -477,9 +515,9 @@ class AAE(nn.Module):
                 # -----------------
                 #  Train Generator
                 # -----------------
-                optimizer_E.zero_grad()
-                optimizer_D.zero_grad()
-                optimizer_awl.zero_grad()
+                self.optimizer_E.zero_grad()
+                self.optimizer_D.zero_grad()
+                self.optimizer_awl.zero_grad()
 
                 # Forward pass
                 (
@@ -522,16 +560,16 @@ class AAE(nn.Module):
                 loss = awl(hparams.sigma*loss_contrast1, hparams.sigma*loss_contrast2, hparams.sigma*loss_contrast3) + 10000*ed_loss
 
                 loss.backward()
-                optimizer_E.step()
-                optimizer_D.step()
+                self.optimizer_E.step()
+                self.optimizer_D.step()
 
-                optimizer_awl.step()
+                self.optimizer_awl.step()
 
                 # ----------------------
                 #  Train Discriminator z
                 # ----------------------
 
-                optimizer_D_z.zero_grad()
+                self.optimizer_D_z.zero_grad()
                 mu, logvar = self._encode(depths_in, tnfs_in)[:2]
                 z_latent = self._reparameterization(mu, logvar)
 
@@ -544,13 +582,13 @@ class AAE(nn.Module):
                 d_z_loss = 0.5 * (d_z_loss_prior + d_z_loss_latent)
 
                 d_z_loss.backward()
-                optimizer_D_z.step()
+                self.optimizer_D_z.step()
 
                 # ----------------------
                 #  Train Discriminator y
                 # ----------------------
 
-                optimizer_D_y.zero_grad()
+                self.optimizer_D_y.zero_grad()
                 y_latent = self._encode(depths_in, tnfs_in)[2]
                 d_y_loss_prior = adversarial_loss(
                     self._discriminator_y(y_prior), labels_prior
@@ -561,7 +599,7 @@ class AAE(nn.Module):
                 d_y_loss = 0.5 * (d_y_loss_prior + d_y_loss_latent)
 
                 d_y_loss.backward()
-                optimizer_D_y.step()
+                self.optimizer_D_y.step()
 
                 ED_loss_e += float(ed_loss.item())
                 loss_e += float(loss.item())
@@ -591,29 +629,6 @@ class AAE(nn.Module):
                         file=logfile,
                     )
                     logfile.flush()
-
-        # save model
-        if modelfile is not None:
-            try:
-                checkpoint = {
-                    "state": self.state_dict(),
-                    "optimizer_E": optimizer_E.state_dict(),
-                    "optimizer_D": optimizer_D.state_dict(),
-                    "optimizer_D_z": optimizer_D_z.state_dict(),
-                    "optimizer_D_y": optimizer_D_y.state_dict(),
-                    "nsamples": self.num_samples,
-                    "alpha": self.alpha,
-                    "nhiddens": self.h_n,
-                    "nlatent_l": self.ld,
-                    "nlatent_y": self.y_len,
-                    "sl": self.sl,
-                    "slr": self.slr,
-                    "temp": self.T,
-                }
-                torch.save(checkpoint, modelfile)
-
-            except:
-                pass
 
         return None
     
@@ -678,17 +693,18 @@ class AAE(nn.Module):
             adversarial_loss.cuda()
 
         #### Optimizers
-        optimizer_E = torch.optim.Adam(enc_params, lr=lrate)
-        optimizer_D = torch.optim.Adam(dec_params, lr=lrate)
+        if self.optimizer_E==None:
+            self.optimizer_E = torch.optim.Adam(enc_params, lr=lrate)
+            self.optimizer_D = torch.optim.Adam(dec_params, lr=lrate)
 
-        optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lrate)
-        optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
+            self.optimizer_D_z = torch.optim.Adam(disc_z_params, lr=lrate)
+            self.optimizer_D_y = torch.optim.Adam(disc_y_params, lr=lrate)
 
         #Contrastive Learning
         if self.contrast:
           awl = AutomaticWeightedLoss(3)
-          optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lrate)
-
+          if self.otpimizer_awl==None:
+            self.optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lrate)
 
           '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
           aug_all_method = ['GaussianNoise','Transition','Transversion','Mutation','AllAugmentation']
@@ -762,7 +778,7 @@ class AAE(nn.Module):
                   data_loader = _DataLoader(dataset=TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                       batch_size=data_loader.batch_size if epoch_i == 0 else data_loader.batch_size,
                       shuffle=True, drop_last=False, num_workers=data_loader.num_workers, pin_memory=data_loader.pin_memory)
-              self.trainepoch(epoch_i, data_loader, logfile, hparams, optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss, awl, optimizer_awl)
+              self.trainepoch(epoch_i, data_loader, logfile, hparams, Tensor, T, adversarial_loss, awl)
         
         #Non contrastive learning
         else:
@@ -780,9 +796,13 @@ class AAE(nn.Module):
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(epoch, data_loader, logfile, _Namespace(), optimizer_E, optimizer_D, optimizer_D_y, optimizer_D_z, Tensor, T, modelfile, adversarial_loss)
+                self.trainepoch(epoch, data_loader, logfile, _Namespace(), Tensor, T, adversarial_loss)
             
-
+        if modelfile is not None:
+            try:
+                self.save(modelfile)
+            except:
+                pass
     ########### function that retrieves the clusters from Y latents
     def get_latents(self, contignames, data_loader, last_epoch=True):
         """Retrieve the categorical latent representation (y) and the contiouous latents (l) of the inputs

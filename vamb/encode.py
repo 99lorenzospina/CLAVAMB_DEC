@@ -203,6 +203,7 @@ class VAE(_nn.Module):
         dropout: Optional[float] = 0.2,
         cuda: bool = False,
         c: bool = False,
+        optimizer = None,
     ):
         if nlatent < 1:
             raise ValueError(f"Minimum 1 latent neuron, not {nlatent}")
@@ -245,6 +246,7 @@ class VAE(_nn.Module):
         self.nlatent = nlatent
         self.dropout = dropout
         self.contrast = c
+        self.optimizer = optimizer
 
         # Initialize lists for holding hidden layers
         self.encoderlayers = _nn.ModuleList()
@@ -427,7 +429,6 @@ class VAE(_nn.Module):
         self,
         data_loader: _DataLoader,
         epoch: int,
-        optimizer,
         hparams,
         logfile,
         awl = None,
@@ -449,7 +450,7 @@ class VAE(_nn.Module):
                     tnf_in = tnf_in.cuda()
                     weights = weights.cuda()
     
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
     
                 depths_out, tnf_out, mu, logsigma = self(depths_in, tnf_in)
     
@@ -458,7 +459,7 @@ class VAE(_nn.Module):
                 )
     
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
     
                 epoch_loss += float(loss.item())
                 epoch_kldloss += float(kld.item())
@@ -500,7 +501,7 @@ class VAE(_nn.Module):
                     tnf_aug1 = tnf_aug1.cuda()
                     tnf_aug2 = tnf_aug2.cuda()
 
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
 
                 depths_out, tnf_out, mu, logsigma = self(depths, tnf_in)
                 depths_out1, tnf_out_aug1, mu1, logsigma1 = self(depths, tnf_aug1)
@@ -523,7 +524,7 @@ class VAE(_nn.Module):
                 # loss = awl(awl_c(800*loss_contrast1, 800*loss_contrast2, 800*loss_contrast3), 10000*loss1, 2000*loss2, 2000*loss3)
                 loss.backward()
 
-                optimizer.step()
+                self.optimizer.step()
                 #print('loss', (loss-10000*loss1).item(),loss1.item(),loss_contrast1.item(),loss_contrast2.item(),loss_contrast3.item(),file=logfile)
 
                 epoch_loss += float(loss.item())
@@ -611,6 +612,7 @@ class VAE(_nn.Module):
             "dropout": self.dropout,
             "nhiddens": self.nhiddens,
             "nlatent": self.nlatent,
+            "optimizer": self.optimizer,
             "state": self.state_dict(),
         }
 
@@ -649,7 +651,11 @@ class VAE(_nn.Module):
         nhiddens = dictionary["nhiddens"]
         nlatent = dictionary["nlatent"]
         state = dictionary["state"]
-        vae = cls(ntnf, nsamples, k, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c)
+        try:
+            optimizer = dictionary["optimizer"]
+        except KeyError:
+            optimizer = None
+        vae = cls(ntnf, nsamples, k, nhiddens, nlatent, alpha, beta, dropout, cuda, c=c, optimizer = optimizer)
         vae.load_state_dict(state)
 
         if cuda:
@@ -748,7 +754,8 @@ class VAE(_nn.Module):
         if self.contrast:
             '''Optimizer setting'''
             awl = AutomaticWeightedLoss(3)
-            optimizer = _Adam([{'params':self.parameters(), 'lr':lrate}, {'params': awl.parameters(), 'lr':0.111, 'weight_decay': 0, 'eps': 1e-7}])
+            if self.optimizer == None:
+                self.optimizer = _Adam([{'params':self.parameters(), 'lr':lrate}, {'params': awl.parameters(), 'lr':0.111, 'weight_decay': 0, 'eps': 1e-7}])
             # for param in awl.parameters():
             #     print('awl',type(param), param.size())
             #Other optimizer options (not complemented)
@@ -817,7 +824,7 @@ class VAE(_nn.Module):
 
                 '''Double the batchsize and decrease the learning rate by 0.8 for each batchstep'''
                 if epoch in batchsteps_set:
-                    for param_group in optimizer.param_groups:
+                    for param_group in self.optimizer.param_groups:
                         param_group['lr'] *= hparams.lrate_decent
                         #if param_group['eps']==1e-7:
                         #    param_group['lr'] *=1
@@ -830,11 +837,12 @@ class VAE(_nn.Module):
                     data_loader = _DataLoader(dataset=_TensorDataset(depthstensor, tnftensor, aug_tensor1, aug_tensor2),
                                         batch_size=dataloader.batch_size if epoch == 0 else data_loader.batch_size,
                                         shuffle=True, drop_last=False, num_workers=dataloader.num_workers, pin_memory=dataloader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, hparams, logfile, awl)
+                self.trainepoch(data_loader, epoch, hparams, logfile, awl)
 
         # vamb
         else:
-            optimizer = _Adam(self.parameters(), lr=lrate)
+            if self.optimizer==None:
+                self.optimizer = _Adam(self.parameters(), lr=lrate)
             data_loader = _DataLoader(dataset=dataloader.dataset,
                                     batch_size=dataloader.batch_size,
                                     shuffle=True,
@@ -849,7 +857,7 @@ class VAE(_nn.Module):
                                         drop_last=False,
                                         num_workers=data_loader.num_workers,
                                         pin_memory=data_loader.pin_memory)
-                self.trainepoch(data_loader, epoch, optimizer, argparse.Namespace(), logfile)
+                self.trainepoch(data_loader, epoch, argparse.Namespace(), logfile)
 
         # Save weights - Lord forgive me, for I have sinned when catching all exceptions
         if modelfile is not None:

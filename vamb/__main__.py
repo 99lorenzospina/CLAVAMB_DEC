@@ -995,7 +995,7 @@ def main():
     aaeos = parser.add_argument_group(title='AAE options', description=None)
 
     aaeos.add_argument('--n_aae', dest='nhiddens_aae', metavar='', type=int, nargs='+',
-                        default=None, help='hidden neurons AAE [547]')
+                        default=None, help='hidden neurons AAE [Auto]')
     aaeos.add_argument('--z_aae', dest='nlatent_aae_z', metavar='', type=int,
                         default=283, help='latent neurons AAE continuous latent space  [283]')
     aaeos.add_argument('--y_aae', dest='nlatent_aae_y', metavar='', type=int,
