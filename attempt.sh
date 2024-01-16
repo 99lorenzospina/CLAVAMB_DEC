@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH -J airways_urog_skin__TNFabundance__nocontrastive__estimatek__noGPU
+#SBATCH -J airways_urog_skin__TNFabundance__nocontrastive__estimatek__noGPU__ONLYESTIM
 #SBATCH -o output_%j.txt
 #SBATCH -e errors_%j.txt
-#SBATCH -t 00:00:00
+#SBATCH -t 13:00:00
 #SBATCH -n 8
 #SBATCH -p allgroups
+#SBATCH -x runner-11
 
 cd /nfsd/bcb/bcbg/spina/
 source tesi_env/bin/activate
