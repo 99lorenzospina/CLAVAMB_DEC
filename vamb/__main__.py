@@ -164,11 +164,12 @@ def calc_rpkm(
         #multiple files in input (multiple datasets)
         else:
             print("Loading data from FASTA files {}".format(rpkmpath), file=logfile)
-            old = np.array([])
+            old = None
             for path in rpkmpath:
                 log('Loading RPKM from npz array {}'.format(path), logfile, 1)
                 rpkms = vamb.vambtools.read_npz(path)
-                rpkms = np.concatenate((old, rpkms))
+                if old != None:
+                    rpkms = np.concatenate((old, rpkms))
                 old = rpkms
                 if not rpkms.dtype == np.float32:
                     raise ValueError('RPKMs .npz array must be of float32 dtype')
