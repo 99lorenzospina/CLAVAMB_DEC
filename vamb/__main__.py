@@ -98,7 +98,7 @@ def calc_tnf(
             composition.save(os.path.join(outdir, "composition.npz"))
         #multiple files in input (multiple datasets)
         else:
-            print("Loading data from FASTA files {}".format(fastapath), file=logfile)
+            log(f"Loading data from FASTA files {fastapath}", logfile, 1)
             b = True
             for path in fastapath:
                 if not contrastive:
@@ -168,7 +168,7 @@ def calc_rpkm(
             for path in rpkmpath:
                 log('Loading RPKM from npz array {}'.format(path), logfile, 1)
                 rpkms = vamb.vambtools.read_npz(path)
-                rpkms = np.concatenate(old, rpkms)
+                rpkms = np.concatenate((old, rpkms))
                 old = rpkms
                 if not rpkms.dtype == np.float32:
                     raise ValueError('RPKMs .npz array must be of float32 dtype')
@@ -1206,8 +1206,6 @@ def main():
             "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
 
-    print(rpkm)
-    print(type(rpkm))
     if rpkm is not None:
         if isinstance(rpkm, str):
             if not os.path.isfile(rpkm):
