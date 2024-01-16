@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J airways_urog_skin__TNFabundance__nocontrastive__estimatek__noGPU__ONLYESTIM
-#SBATCH -o output_%j.txt
-#SBATCH -e errors_%j.txt
+#SBATCH -o /nfsd/bcb/bcbg/spina/output_%j.txt
+#SBATCH -e /nfsd/bcb/bcbg/spina/errors_%j.txt
 #SBATCH -t 13:00:00
 #SBATCH -n 8
 #SBATCH -p allgroups
