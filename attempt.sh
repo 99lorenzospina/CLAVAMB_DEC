@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J airways_urog_skin_TNFabundance__noGPU
+#SBATCH -J airways_urog_skin__TNFabundance__nocontrastive__estimatek__noGPU
 #SBATCH -o output_%j.txt
 #SBATCH -e errors_%j.txt
 #SBATCH -t 00:00:00
@@ -10,4 +10,11 @@ cd /nfsd/bcb/bcbg/spina/
 source tesi_env/bin/activate
 cd CLAVAMB/vamb
 
-srun 
+srun vamb --model aae --outdir /nfsd/bcb/bcbg/spina \
+--fasta /nfsd/bcb/bcbg/spina/airways/contigs.fna.gz \
+/nfsd/bcb/bcbg/spina/skin/contigs.fna.gz \
+/nfsd/bcb/bcbg/spina/urog/contigs.fna.gz \
+--rpkm /nfsd/bcb/bcbg/spina/airways/abundance.npz  \
+/nfsd/bcb/bcbg/spina/skin/abundance.npz  \
+/nfsd/bcb/bcbg/spina/urog/abundance.npz  \
+-o C

@@ -690,7 +690,7 @@ def binsplit(
     Example:
     >>> clusters = {"bin1": {"s1-c1", "s1-c5", "s2-c1", "s2-c3", "s5-c8"}}
     >>> binsplit(clusters, "-")
-    {'s2-bin1': {'s1-c1', 's1-c3'}, 's1-bin1': {'s1-c1', 's1-c5'}, 's5-bin1': {'s1-c8'}}
+    {'s2-bin1': {'s2-c1', 's2-c3'}, 's1-bin1': {'s1-c1', 's1-c5'}, 's5-bin1': {'s5-c8'}}
     """
     if isinstance(clusters, dict): # added by Pau since y clusters are in a dictionary object
         clusters = clusters.items()

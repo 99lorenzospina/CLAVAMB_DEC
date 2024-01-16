@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+'''
+vamb --model aae --outdir /home/lorenzo/ \
+--fasta /home/lorenzo/airways/contigs.fna.gz /home/lorenzo/skin/contigs.fna.gz /home/lorenzo/urog/contigs.fna.gz \
+--rpkm /home/lorenzo/airways/abundance.npz /home/lorenzo/skin/abundance.npz /home/lorenzo/urog/abundance.npz  \
+-o C
+'''
 
 # More imports below, but the user's choice of processors must be parsed before
 # numpy can be imported.
@@ -829,7 +835,7 @@ def main():
     tnfos = parser.add_argument_group(
         title="TNF input (either fasta or all .npz files required)"
     )
-    tnfos.add_argument("--fasta", metavar="", help="path to fasta file or paths to fasta files")
+    tnfos.add_argument("--fasta", metavar="", nargs='+', help="path to fasta file or paths to fasta files")
     tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
     tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers instead of tnf [False]')
@@ -852,7 +858,7 @@ def main():
     rpkmos.add_argument(
         "--bamfiles", metavar="", help="paths to (multiple) BAM files", nargs="+"
     )
-    rpkmos.add_argument("--rpkm", metavar="", help="path or paths to .npz of RPKM (abundances)")
+    rpkmos.add_argument("--rpkm", nargs="+", metavar="", help="path or paths to .npz of RPKM (abundances)")
     rpkmos.add_argument('--jgi', metavar='', help='path to output of jgi_summarize_bam_contig_depths')
 
     # Optional arguments
@@ -1199,6 +1205,8 @@ def main():
             "Must specify exactly one of BAM files, JGI file or RPKM input"
         )
 
+    print(rpkm)
+    print(type(rpkm))
     if rpkm is not None:
         if isinstance(rpkm, str):
             if not os.path.isfile(rpkm):

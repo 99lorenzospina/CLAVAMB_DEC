@@ -184,7 +184,7 @@ class gmeans:
         self.__clusters, self.__centers, _ = self._search_optimal_parameters(self.__data, self.__k_init)
         self.indices_to_keep= numpy.array(self.__clusters[0]) #initially, all indices are to be kept
         while True:
-            print("current_amount_cluster is ", len(self.__clusters))
+            print("the clusters to examinate are ", len(self.__clusters))
             added = self._statistical_optimization()
 
             if not added:
@@ -313,14 +313,14 @@ class gmeans:
             #either new_centers contains the new centers or the points of the cluster
             new_centers, split = self._split_and_search_optimal(self.__clusters[index])
             if not split:  #the cluster is not split!
-                print("not split")
+                #print("not split")
                 self.definitive_centers.append(self.__centers[index])
                 points_to_remove = new_centers
                 indices_to_remove = numpy.where(numpy.isin(self.__data, points_to_remove).all(axis=1))
                 self.indices_to_keep = numpy.setdiff1d(self.indices_to_keep, indices_to_remove)
                 
             else:
-                print("split")
+                #print("split")
                 centers += new_centers
                 added = True
 
