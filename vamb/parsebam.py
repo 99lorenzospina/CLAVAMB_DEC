@@ -366,6 +366,47 @@ def read_bamfiles(paths, dumpdirectory=None, refhash=None, minscore=None, minlen
 
     return rpkms
 
+def avg_window(x, finalshape=10, axis=1):
+    """
+    Averaging window with subsampling
+    Args:
+        x (np.array): Values to process
+        window_size (int): Smoothing window size
+        window_step (int): Smoothing window step
+    Returns:
+        np.array
+    """
+    if(x.shape[1] <= finalshape):
+        padded_arr = _np.zeros((x.shape[0], finalshape), dtype=x.dtype)
+        padded_arr[:, :x.shape[1]] = x
+        return padded_arr
+    window_size, window_step = find_a_b(x.shape[1], finalshape-1)
+    cumsum = _np.cumsum(_np.insert(x, 0, 0, axis=axis), axis=axis)
+
+    x_avg = (
+        _np.take(cumsum, range(window_size, x.shape[axis]+1), axis=axis)
+        - _np.take(cumsum, range(0, x.shape[axis]+1-window_size), axis=axis)
+    ) / float(window_size)
+
+    return _np.take(x_avg, range(0, x_avg.shape[axis], window_step), axis=axis)
+
+def find_a_b(x, y):
+    import sys
+    closest_b = sys.maxsize
+    result_a = 0
+    result_b = 0
+
+    for a in range(1, x + 1):
+        b_candidate = (x - a) / y
+        if b_candidate.is_integer() and b_candidate > 0:
+            b = int(b_candidate)
+            if abs(b - a/2) < closest_b:
+                closest_b = abs(b - a/2)
+                result_a = a
+                result_b = b
+
+    return result_a, result_b
+
 read_bamfiles.__doc__ = """Spawns processes to parse BAM files and get contig rpkms.
 
 Input:

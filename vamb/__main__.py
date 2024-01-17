@@ -169,6 +169,7 @@ def calc_rpkm(
                 log('Loading RPKM from npz array {}'.format(path), logfile, 1)
                 rpkms = vamb.vambtools.read_npz(path)
                 if len(old) != 0:
+                    rpkms = vamb.parsebam.avg_window(rpkms)
                     rpkms = np.concatenate((old, rpkms))
                 old = rpkms
                 if not rpkms.dtype == np.float32:
@@ -547,6 +548,7 @@ def run(
     log("Date and time is " + str(datetime.datetime.now()), logfile, 1)
     begintime = time.time()/60
     # Get TNFs, save as npz
+
     composition = calc_tnf(outdir,
                            fastapath,
                            compositionpath,
@@ -558,7 +560,6 @@ def run(
                            contrastive=contrastive,
                            k=k,
                            use_pc = use_pc)
-    
     
     # Parse BAMs, save as npz
     refhash = None if norefcheck else vamb.vambtools._hash_refnames(composition.metadata.identifiers)
@@ -1349,7 +1350,7 @@ def main():
     logpath = os.path.join(outdir, "log.txt")
 
     with open(logpath, "w") as logfile:
-        if args.contrastive_vae and args.contrastive_aae:
+        if args.contrastive_vae and args.contrastive_aae and nepochs_aae != nepochs:
             #because of augmented data generation technique, keeping two values
             #may create conflicts
             log('Setting same number of epochs for aae and vae', logfile)

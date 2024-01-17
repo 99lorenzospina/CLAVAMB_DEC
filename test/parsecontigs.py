@@ -165,9 +165,9 @@ for path in paths:
             composition = None
         file.close()
         print("temp.tnf shape", temp.matrix.shape)
-        print(temp.matrix)
+        #print(temp.matrix)
         print("temp.contignames shape",temp.metadata.identifiers.shape)
-        print(temp.metadata.identifiers)
+        #print(temp.metadata.identifiers)
         print("temp.contiglengths shape",temp.metadata.lengths.shape)
     with vamb.vambtools.Reader(path) as file:
         composition = vamb.parsecontigs.Composition.concatenate(composition, temp
@@ -176,9 +176,8 @@ for path in paths:
         contignames = composition.metadata.identifiers
         contiglengths = composition.metadata.lengths
         print("second temp.tnf shape", tnf.shape)
-        print(tnf)
         print("second temp.contignames shape",contignames.shape)
-        print(contignames)
+        #print(contignames)
         print("second temp.contiglengths shape",contiglengths.shape)
         file.close()
 print("finals:", tnf.shape)
