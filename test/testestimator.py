@@ -29,6 +29,14 @@ def guess_clusters_num(sequences, init_K=4, end_situation=0.1):
         last_score = new_score
     return init_K
 '''
+logpath = os.path.join("/home/lorenzo/CLAVAMB_DEC/test/data", "log.txt")
+tnf = np.ones((10, 9))
+rpkm = np.ones((10, 8))
+with open(logpath, "w") as logfile:
+    estimator = vamb.species_number.gmeans(np.concatenate((tnf, rpkm), axis=1), logfile, ccore = False)
+    estimator.process()
+    nlatent_aae_y = len(estimator.get_definitive_centers())
+    print(nlatent_aae_y)
 with vamb.vambtools.Reader(os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')) as file:
         composition = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc= True)
         file.close()
@@ -37,8 +45,8 @@ tnf = composition.matrix
 rpkm = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'abundance.npz'))
 lengths = composition.metadata.lengths
 dataloader, mask = vamb.encode.make_dataloader(rpkm, tnf, lengths, batchsize=16)
-
-estimator = vamb.species_number.gmeans(np.concatenate((tnf, rpkm), axis=1), ccore = False)
-estimator.process()
-nlatent_aae_y = len(estimator.get_definitive_centers())
-print(nlatent_aae_y)    #3502 (airways, tnf+abundance), 2267 (airways, pc+abundance)
+with open(logpath, "w") as logfile:
+    estimator = vamb.species_number.gmeans(np.concatenate((tnf, rpkm), axis=1), logfile, ccore = False)
+    estimator.process()
+    nlatent_aae_y = len(estimator.get_definitive_centers())
+    print(nlatent_aae_y)    #3502 (airways, tnf+abundance), 2267 (airways, pc+abundance)

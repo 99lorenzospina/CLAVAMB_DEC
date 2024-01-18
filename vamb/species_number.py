@@ -16,6 +16,7 @@ for the same reason, get_clusters() returns only the clusters of current iterati
 
 import numpy
 import scipy.stats
+from typing import IO
 
 from pyclustering.core.gmeans_wrapper import gmeans as gmeans_wrapper
 from pyclustering.core.wrapper import ccore_library
@@ -110,7 +111,7 @@ class gmeans:
 
     """
 
-    def __init__(self, data, k_init=1, ccore=True, **kwargs):
+    def __init__(self, data, logfile, k_init=1, ccore=True, **kwargs):
         """!
         @brief Initializes G-Means algorithm.
 
@@ -145,6 +146,7 @@ class gmeans:
         self.__repeat = kwargs.get('repeat', 3)
         self.__k_max = kwargs.get('k_max', -1)
         self.__random_state = kwargs.get('random_state', None)
+        self.logfile = logfile
 
         if self.__ccore is True:
             self.__ccore = ccore_library.workable()
@@ -184,7 +186,7 @@ class gmeans:
         self.__clusters, self.__centers, _ = self._search_optimal_parameters(self.__data, self.__k_init)
         self.indices_to_keep= numpy.array(self.__clusters[0]) #initially, all indices are to be kept
         while True:
-            print("the clusters to examinate are ", len(self.__clusters))
+            self.log(string_to_log, self.logfile, 1)
             added = self._statistical_optimization()
 
             if not added:
@@ -193,7 +195,8 @@ class gmeans:
             self._perform_clustering()
 
         self.nclusters = len(self.definitive_centers)
-        print("setting nclusters as ", self.nclusters)
+        string_to_log = "setting nclusters as " + str(self.nclusters)
+        self.log(string_to_log, self.logfile, 1)
         return self
     
     '''
@@ -514,3 +517,8 @@ class gmeans:
 
         if (self.__k_max != -1) and (self.__k_max < self.__k_init):
             raise ValueError("Initial amount of clusters should be less than the maximum amount 'k_max'.")
+    
+    @classmethod
+    def log(cls, string: str, logfile: IO[str], indent: int = 0):
+        print(("\t" * indent) + string, file=logfile)
+        logfile.flush()
