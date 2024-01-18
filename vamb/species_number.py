@@ -186,6 +186,7 @@ class gmeans:
         self.__clusters, self.__centers, _ = self._search_optimal_parameters(self.__data, self.__k_init)
         self.indices_to_keep= numpy.array(self.__clusters[0]) #initially, all indices are to be kept
         while True:
+            string_to_log = "working on a number of clusters: " + str(len(self.__clusters))
             self.log(string_to_log, self.logfile, 1)
             added = self._statistical_optimization()
 
