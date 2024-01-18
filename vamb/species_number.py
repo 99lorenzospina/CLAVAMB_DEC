@@ -331,47 +331,6 @@ class gmeans:
         self.__centers = centers
         return added
 
-    '''def _statistical_optimization(self):
-        """!
-        @brief Try to split cluster into two to find optimal amount of clusters.
-
-        """
-        centers = []
-        potential_amount_clusters = len(self.__clusters)
-        for index in range(len(self.__clusters)):
-            new_centers = self._split_and_search_optimal(self.__clusters[index])
-            if (new_centers is None) or ((self.__k_max != -1) and (potential_amount_clusters >= self.__k_max)):
-                centers.append(self.__centers[index])
-            else:
-                centers += new_centers
-                potential_amount_clusters += 1
-
-        self.__centers = centers'''
-
-    '''
-    def _split_and_search_optimal(self, cluster):
-        """!
-        @brief Split specified cluster into two by performing K-Means clustering and check correctness by
-                Anderson-Darling test.
-
-        @param[in] cluster (array_like) Cluster that should be analysed and optimized by splitting if it is required.
-
-        @return (array_like) Two new centers if two new clusters are considered as more suitable.
-                (None) If current cluster is more suitable.
-        """
-        if len(cluster) == 1:
-            return None
-
-        points = [self.__data[index_point] for index_point in cluster]
-        new_clusters, new_centers, _ = self._search_optimal_parameters(points, 2)
-
-        if len(new_centers) > 1:
-            accept_null_hypothesis = self._is_null_hypothesis(points, new_centers)
-            if not accept_null_hypothesis:
-                return new_centers  # If null hypothesis is rejected then use two new clusters
-
-        return None
-    '''
     def _split_and_search_optimal(self, cluster):
         """!
         @brief Split specified cluster into two by performing K-Means clustering and check correctness by
