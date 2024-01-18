@@ -1,0 +1,41 @@
+Bootstrap: docker
+From: python:3.9.0
+
+%post
+    
+    # Install HMMER
+    apt-get update && apt-get install -y hmmer
+
+    # Install Git
+    apt-get install -y git
+
+    # Install make
+    apt-get install -y build-essential
+
+    # Clone Prodigal and install
+    apt-get install -y zlib1g-dev wget unzip
+    git clone https://github.com/hyattpd/Prodigal
+    cd Prodigal && make install
+    cd ..
+
+    # Download and install pplacer
+    wget https://github.com/matsen/pplacer/releases/download/v1.1.alpha19/pplacer-linux-v1.1.alpha19.zip
+    unzip pplacer-linux-v1.1.alpha19.zip
+    export PATH=$PATH:/pplacer-Linux-v1.1.alpha19
+    chmod +x /pplacer-Linux-v1.1.alpha19/pplacer
+
+    # Install Python packages
+    apt-get install -y python3-pip
+    pip3 install numpy matplotlib pysam checkm-genome
+
+    # Download and set CHECKM_DATA_PATH
+    wget https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz
+    mkdir checkm_data_2015_01_16
+    tar -xzvf checkm_data_2015_01_16.tar.gz -C checkm_data_2015_01_16
+    export CHECKM_DATA_PATH=/checkm_data_2015_01_16
+
+%environment
+    export PATH=$PATH:/usr/local/bin
+    export PATH=$PATH:/pplacer-Linux-v1.1.alpha19
+    export CHECKM_DATA_PATH=/checkm_data_2015_01_16
+    # Aggiungi il percorso di installazione di Python alla variabile PATH
