@@ -604,10 +604,10 @@ def run(
         #estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
         estimator = vamb.species_number.gmeans(np.concatenate((composition.matrix, abundance), axis=1), logfile, ccore = False)
         estimator.process()
-        nlatent_aae_y = len(estimator.get_clusters())
+        nlatent_aae_y = len(estimator.get_definitive_centers())
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)
-        log(f"\nCluster estimated in {time_generating_input}", logfile, 1)
+        log(f"\nCluster estimated in {time_generating_input} minutes", logfile, 1)
         log(f"\nEstimated {nlatent_aae_y} clusters", logfile, 1)
         exit()
 

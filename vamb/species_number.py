@@ -188,7 +188,6 @@ class gmeans:
         while True:
             string_to_log = "working on a number of clusters: " + str(len(self.__clusters))
             self.log(string_to_log, self.logfile, 1)
-            print(string_to_log)
             added = self._statistical_optimization()
 
             if not added:
@@ -199,7 +198,6 @@ class gmeans:
         self.nclusters = len(self.definitive_centers)
         string_to_log = "setting nclusters as " + str(self.nclusters)
         self.log(string_to_log, self.logfile, 1)
-        print(string_to_log)
         return self
     
     def predict(self, points):

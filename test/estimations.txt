@@ -1,0 +1,12 @@
+Job ID: 1391230: estimate k for airways with TNF+Abundance
+setting nclusters as 3247
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Nodes: 5
+Cores per node: 1
+CPU Utilized: 11:19:54
+CPU Efficiency: 87.87% of 12:53:44 core-walltime
+Job Wall-clock time: 01:36:43
+Memory Utilized: 13.26 GB (estimated maximum)
+Memory Efficiency: 84.89% of 15.62 GB (1.95 GB/core)
