@@ -602,7 +602,7 @@ def run(
         log(f"\nEstimate the number of clusters", logfile, 1)
         begintime = time.time()/60
         #estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
-        estimator = vamb.species_number.gmeans(abundance, logfile)
+        estimator = vamb.species_number.gmeans(np.concatenate((composition.matrix, abundance), axis=1), logfile, ccore = False)
         estimator.process()
         nlatent_aae_y = len(estimator.get_clusters())
         timepoint_gernerate_input=time.time()/60

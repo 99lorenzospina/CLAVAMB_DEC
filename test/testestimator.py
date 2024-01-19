@@ -9,6 +9,7 @@ import gzip
 import time
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score as score
+import psutil
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
@@ -39,7 +40,7 @@ with open(logpath, "w") as logfile:
     nlatent_aae_y = len(estimator.get_definitive_centers())
     print(nlatent_aae_y)
 with vamb.vambtools.Reader(os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')) as file:
-        composition = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc= True)
+        composition = vamb.parsecontigs.Composition.from_file(file, minlength=100, use_pc= False)
         file.close()
 
 tnf = composition.matrix
@@ -56,3 +57,7 @@ with open(logpath, "w") as logfile:
     timepoint_gernerate_input=time.time()/60
     time_generating_input= round(timepoint_gernerate_input-begintime,2)
     print(f"\nCluster estimated in {time_generating_input}")
+
+print(f"Numero di thread: {psutil.cpu_count(logical=False)}")
+print(f"Uso della CPU: {psutil.cpu_percent()}%")
+print(f"Uso della memoria: {psutil.virtual_memory().percent}%")
