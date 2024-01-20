@@ -42,7 +42,7 @@ class AAE(nn.Module):
         sl: float = 0.00964,
         slr: float = 0.5,
         alpha: Optional[float] = None,
-        _cuda: bool = False,
+        cuda: bool = False,
         k: int = 4,
         contrast: bool = False,
         optimizer_E = None,
