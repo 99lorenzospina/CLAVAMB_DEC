@@ -1,5 +1,6 @@
 Job ID: 1391230: estimate k for airways with TNF+Abundance
 setting nclusters as 3247
+Cluster estimated in 94.79
 Cluster: cluster_dei
 User/Group: spinaloren/studenti
 State: COMPLETED (exit code 0)
