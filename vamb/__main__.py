@@ -112,7 +112,6 @@ def calc_tnf(
                         file.close()    
                 if contrastive:
                     os.system(f'mkdir -p {augmentation_store_dir}')
-                    backup_iteration = math.ceil(math.sqrt(nepochs))
                     log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
                     with vamb.vambtools.Reader(fastapath) as file:
                         #Generate the composition for this path and update the overall augmentation files
