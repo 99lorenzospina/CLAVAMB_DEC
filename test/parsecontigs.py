@@ -149,6 +149,7 @@ with vamb.vambtools.Reader(bigpath) as f:
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
     
 paths = [fasta_path, bigpath]
+paths =[os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')]
 backup_iteration=18
 index_list_one = list(range(backup_iteration))
 random.shuffle(index_list_one)

@@ -845,8 +845,8 @@ def main():
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
     contrastiveos.add_argument('--contrastive_vae', action='store_true', default=False, help='Whether to perform contrastive learning(CLMB) or not(VAMB). [False]')
     contrastiveos.add_argument('--contrastive_aae', action='store_true', default=False, help='Whether to perform contrastive learning(CLAMB) or not(AAMB). [False]')
-    contrastiveos.add_argument('--augmode', metavar='', nargs = 2, type = int, default=[3, 3],
-                        help='The augmentation method. Requires 2 int. specify -1 if trying all augmentation methods. Choices: 0 for gaussian noise, 1 for transition, 2 for transversion, 3 for mutation, -1 for all. [3, 3]')
+    contrastiveos.add_argument('--augmode', metavar='', nargs = 2, type = int, default=[-1, -1],
+                        help='The augmentation method. Requires 2 int. specify -1 if trying all augmentation methods. Choices: 0 for gaussian noise, 1 for transition, 2 for transversion, 3 for mutation, -1 for all. [-1, -1]')
     contrastiveos.add_argument('--augdatashuffle', action='store_true', default=False,
             help='Whether to shuffle the training augmentation data (True: For each training, random select the augmentation data from the augmentation dir pool.\n!!!BE CAUTIOUS WHEN TURNING ON [False])')
     contrastiveos.add_argument('--augmentation', metavar='', help='path to augmentation dir. [outdir/augmentation]')
@@ -963,7 +963,7 @@ def main():
         help="dropout [Auto]",
     )
     vaeos.add_argument(
-        "--cuda", help="use GPU to train & cluster [False]", action="store_true"
+        "--cuda", help="use GPU to train & cluster [False]", action="store_true", default=False
     )
     vaeos.add_argument('--v_temp', dest='vae_temperature', metavar='', type=float,
                         default=0.1596, help=' Temperature of the softcategorical prior [0.1596]')
@@ -1353,6 +1353,8 @@ def main():
             #may create conflicts
             log('Setting same number of epochs for aae and vae', logfile)
             nepochs_aae = nepochs
+        if 'vae' not in args.model:
+            nepochs = nepochs_aae #for calc_tnf()
         run(
             outdir,
             fasta,

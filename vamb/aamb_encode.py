@@ -718,7 +718,7 @@ class AAE(nn.Module):
           if augmentation_count_number[0] > _math.ceil(_math.sqrt(nepochs)) or augmentation_count_number[1] > _math.ceil(_math.sqrt(nepochs)):
               warnings.warn('Too many augmented data, augmented data might not be trained enough. CLAMB do not know how this influence the performance', FutureWarning)
           elif augmentation_count_number[0] < _math.ceil(_math.sqrt(nepochs)) or augmentation_count_number[1] > _math.ceil(_math.sqrt(nepochs)):
-              raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run VAMB')
+              raise RuntimeError('Shortage of augmented data. Please regenerate enough augmented data using fasta files, or do not specify the --contrastive option to run AAMB')
 
 
           '''Function for shuffling the augmented data (if needed)'''

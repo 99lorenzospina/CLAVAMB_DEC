@@ -329,7 +329,7 @@ class Composition:
         entry_count = _vambtools.count_entry(filehandle)
         print(f'{entry_count} sequences are used for this binning')
 
-        '''If the number of sequences is too large, we might decrease the number of generated augmentation to avoid CLMB being killed.'''
+        '''If the number of sequences is too large, we might decrease the number of generated augmentation to avoid CLAMB being killed.'''
         if entry_count * backup_iteration > 70000000:
             backup_iteration_2 = 70000000 // entry_count
         else:
