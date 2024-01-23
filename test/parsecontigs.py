@@ -149,8 +149,8 @@ with vamb.vambtools.Reader(bigpath) as f:
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
     
 paths = [fasta_path, bigpath]
-paths =[os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')]
-backup_iteration=18
+paths =[fasta_path]
+backup_iteration=9
 index_list_one = list(range(backup_iteration))
 random.shuffle(index_list_one)
 index_list_two = list(range(backup_iteration))
@@ -160,7 +160,7 @@ b=True
 for path in paths:
     print("Examining:", path)
     with vamb.vambtools.Reader(path) as file:
-        temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, index_list=index_list, minlength=100, store_dir="./data/", backup_iteration = 18, use_pc=False, already = not b)
+        temp = vamb.parsecontigs.Composition.read_contigs_augmentation(file, index_list=index_list, minlength=100, store_dir="./data/", backup_iteration = 9, use_pc=False, already = not b)
         if b:
             b = False
             composition = None
