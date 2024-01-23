@@ -14,6 +14,7 @@ import math
 import warnings
 import random
 import os as _os
+import time
 
 __doc__ = """Encode a depths matrix and a tnf matrix to latent representation.
 
@@ -434,6 +435,7 @@ class VAE(_nn.Module):
         awl = None,
     ) -> _DataLoader[tuple[Tensor, Tensor, Tensor]]:
         self.train()
+        time_epoch_0 = time.time()
         #VAMB
         if hparams == argparse.Namespace():
             epoch_loss = 0.0
@@ -465,16 +467,23 @@ class VAE(_nn.Module):
                 epoch_kldloss += float(kld.item())
                 epoch_sseloss += float(sse.item())
                 epoch_celoss += float(ce.item())
+
+                time_epoch_1 = time.time()
+                time_e = _np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+
+                if self.usecuda:
+                    _torch.cuda.empty_cache()
     
             if logfile is not None:
                 print(
-                    "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}".format(
+                    "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}\t Epoch time(min): {: .4}".format(
                         epoch + 1,
                         epoch_loss / len(data_loader),
                         epoch_celoss / len(data_loader),
                         epoch_sseloss / len(data_loader),
                         epoch_kldloss / len(data_loader),
                         data_loader.batch_size,
+                        time_e,
                     ),
                     file=logfile,
                 )
@@ -532,18 +541,25 @@ class VAE(_nn.Module):
                 epoch_cesseloss += float((ce1).item())
                 epoch_clloss += float((sse1).item())
 
+                time_epoch_1 = time.time()
+                time_e = _np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+
+                if self.usecuda:
+                    _torch.cuda.empty_cache()
+
             #Gradient monitor using hook (require extra memory and time cost)
             #for i in range(len(grad_block)):
             #     print('grad', grad_block[i], file=logfile, end='\t\t')
 
             if logfile is not None:
-                print('\tEpoch: {}\tLoss: {:.6f}\tCL: {:.7f}\tCE SSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}'.format(
+                print('\tEpoch: {}\tLoss: {:.6f}\tCL: {:.7f}\tCE SSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}\t Epoch time(min): {: .4}'.format(
                     epoch + 1,
                     epoch_loss / len(data_loader),
                     epoch_clloss / len(data_loader),
                     epoch_cesseloss / len(data_loader),
                     epoch_kldloss / len(data_loader),
                     data_loader.batch_size,
+                    time_e,
                     ), file=logfile)
 
                 logfile.flush()
