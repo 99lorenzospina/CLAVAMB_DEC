@@ -468,7 +468,7 @@ class VAE(_nn.Module):
     
             if logfile is not None:
                 print(
-                    "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}\n".format(
+                    "\tEpoch: {}\tLoss: {:.6f}\tCE: {:.7f}\tSSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}".format(
                         epoch + 1,
                         epoch_loss / len(data_loader),
                         epoch_celoss / len(data_loader),
@@ -537,7 +537,7 @@ class VAE(_nn.Module):
             #     print('grad', grad_block[i], file=logfile, end='\t\t')
 
             if logfile is not None:
-                print('\tEpoch: {}\tLoss: {:.6f}\tCL: {:.7f}\tCE SSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}\n'.format(
+                print('\tEpoch: {}\tLoss: {:.6f}\tCL: {:.7f}\tCE SSE: {:.6f}\tKLD: {:.4f}\tBatchsize: {}'.format(
                     epoch + 1,
                     epoch_loss / len(data_loader),
                     epoch_clloss / len(data_loader),
