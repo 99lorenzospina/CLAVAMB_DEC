@@ -66,6 +66,9 @@ class AAE(nn.Module):
         if not (0 < alpha < 1):
             raise ValueError(f"alpha must be 0 < alpha < 1, not {alpha}")
 
+        if nhiddens == None:
+            nhiddens = 547
+
         super(AAE, self).__init__()
 
         self.nsamples = nsamples
@@ -85,8 +88,6 @@ class AAE(nn.Module):
         self.optimizer_D_y = optimizer_D_y
         self.optimizer_D_z = optimizer_D_z
         self.optimizer_awl = optimizer_awl
-        print(self.input_len)
-        print(self.h_n)
 
         # encoder
         self.encoder = nn.Sequential(

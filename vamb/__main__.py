@@ -74,6 +74,7 @@ def calc_tnf(
     else:
         assert fastapath is not None
         if contrastive:
+            backup_iteration = math.ceil(math.sqrt(nepochs))
             index_list_one = list(range(backup_iteration))
             random.shuffle(index_list_one)
             index_list_two = list(range(backup_iteration))
@@ -89,7 +90,6 @@ def calc_tnf(
                     file.close()
             else:
                 os.system(f'mkdir -p {augmentation_store_dir}')
-                backup_iteration = math.ceil(math.sqrt(nepochs))
                 log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
                 with vamb.vambtools.Reader(fastapath) as file:
                     composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
