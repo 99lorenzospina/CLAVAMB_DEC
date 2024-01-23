@@ -706,7 +706,7 @@ class AAE(nn.Module):
         #Contrastive Learning
         if self.contrast:
           awl = AutomaticWeightedLoss(3)
-          if self.otpimizer_awl==None:
+          if self.optimizer_awl==None:
             self.optimizer_awl = torch.optim.Adam(awl.parameters(), lr=lrate)
 
           '''Read augmentation data from indexed files. Note that, CLMB can't guarantee an order training with augmented data if the outdir exists.'''
