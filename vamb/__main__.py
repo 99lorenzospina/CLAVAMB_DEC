@@ -1349,7 +1349,7 @@ def main():
 
     logpath = os.path.join(outdir, "log.txt")
 
-    with open(logpath, "a") as logfile:
+    with open(logpath, "w") as logfile:
         if args.contrastive_vae and args.contrastive_aae and nepochs_aae != nepochs:
             #because of augmented data generation technique, keeping two values
             #may create conflicts
