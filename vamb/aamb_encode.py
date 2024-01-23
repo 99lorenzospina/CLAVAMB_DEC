@@ -85,6 +85,8 @@ class AAE(nn.Module):
         self.optimizer_D_y = optimizer_D_y
         self.optimizer_D_z = optimizer_D_z
         self.optimizer_awl = optimizer_awl
+        print(self.input_len)
+        print(self.h_n)
 
         # encoder
         self.encoder = nn.Sequential(
