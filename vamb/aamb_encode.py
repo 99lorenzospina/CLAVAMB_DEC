@@ -78,7 +78,7 @@ class AAE(nn.Module):
         self.sl = sl
         self.slr = slr
         self.alpha = alpha
-        self.usecuda = _cuda
+        self.usecuda = cuda
         self.contrast = contrast
         self.optimizer_E = optimizer_E
         self.optimizer_D = optimizer_D
@@ -131,7 +131,7 @@ class AAE(nn.Module):
             nn.Sigmoid(),
         )
 
-        if _cuda:
+        if cuda:
             self.cuda()
 
     ## Reparametrisation trick

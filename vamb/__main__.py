@@ -1173,9 +1173,9 @@ def main():
 
         for i in range(2):
             if args.augmode[i] == -1:
-                augmentation_number[i] = len(glob.glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*'))
+                augmentation_number[i] = len(glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*'))
             elif 0<= args.augmode[i] <= 3:
-                augmentation_number[i] = len(glob.glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*_{aug_all_method[args.augmode[i]]}_*'))
+                augmentation_number[i] = len(glob(rf'{augmentation_data_dir+os.sep}pool{i}*k{args.k}*_{aug_all_method[args.augmode[i]]}_*'))
             else:
                 raise argparse.ArgumentTypeError('If contrastive learning is on, augmode must be int >-2 and <4')
 
@@ -1193,7 +1193,7 @@ def main():
                     print(f'Program to be continued in {20-4*sleep_time}s, please use ctrl+C to stop this process if you would not like the augmentation dir to be rewritten')
                     time.sleep(5)
                 warnings.warn("Not enough augmentation, regenerate the augmentation to maintain the performance, erasing the augmentation dir. We will regenerate the augmentation in the following function", UserWarning)
-                for erase_file in glob.glob(rf'{augmentation_data_dir+os.sep}pool*k{args.k}*'):
+                for erase_file in glob(rf'{augmentation_data_dir+os.sep}pool*k{args.k}*'):
                     print(f'removing {erase_file} ...')
                     os.system(f'rm {erase_file}')
 
