@@ -452,6 +452,8 @@ class AAE(nn.Module):
 
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+                if self.usecuda:
+                    torch.cuda.empty_cache()
           if logfile is not None:
                 print(
                     "\tEpoch: {}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
@@ -614,8 +616,10 @@ class AAE(nn.Module):
 
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
+                if self.usecuda:
+                    torch.cuda.empty_cache()
 
-                if logfile is not None:
+            if logfile is not None:
                     print(
                         "\tEpoch: {}\t Loss: {:.6f}\t Loss Enc/Dec: {:.6f}\t Rec. loss: {:.4f}\t CE: {:.4f}\tSSE: {:.4f}\t Dz loss: {:.7f}\t Dy loss: {:.6f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
                             epoch_i + 1,
