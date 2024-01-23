@@ -96,8 +96,7 @@ def calc_tnf(
                         file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
                     file.close()
             composition.save(os.path.join(outdir, "composition.npz"))
-        #multiple files in input (multiple datasets)
-        else:
+        else:        #multiple files in input (multiple datasets)
             log(f"Loading data from FASTA files {fastapath}", logfile, 1)
             b = True
             for path in fastapath:
@@ -113,7 +112,7 @@ def calc_tnf(
                 if contrastive:
                     os.system(f'mkdir -p {augmentation_store_dir}')
                     log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
-                    with vamb.vambtools.Reader(fastapath) as file:
+                    with vamb.vambtools.Reader(path) as file:
                         #Generate the composition for this path and update the overall augmentation files
                         newcomp = vamb.parsecontigs.Composition.read_contigs_augmentation(
                             file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, already = not b)
