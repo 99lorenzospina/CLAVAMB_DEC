@@ -351,7 +351,7 @@ class ClusterGenerator:
         cluster = Cluster(
             int(self.indices[medoid].item()),  # type: ignore
             self.seed,
-            self.indices[points].numpy(),
+            self.indices[points].cpu().numpy(),
             self.peak_valley_ratio,
             threshold,
             isdefault,
