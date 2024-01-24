@@ -2,6 +2,8 @@ import sys
 import os
 import numpy as np
 import random
+import threading
+import time
 
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
@@ -19,7 +21,7 @@ with open(fasta_path) as file:
         raise AssertionError('Should have failed w. TypeError when opening FASTA file in text mode')
     file.close()
 
-'''
+
 # Open and read file
 with open(fasta_path, 'rb') as file:
     contigs = list(vamb.vambtools.byte_iterfasta(file))
@@ -44,7 +46,7 @@ contig3_fourmers_expected = """0000002100000001000001021200010010100110001001120
 10000120010100010001000010011110100000100""".replace('\n', '')
 contig3_fourmers_observed = contigs[2].kmercounts(4)
 print(contig3_fourmers_observed)
-'''
+
 for i, j in zip(contig3_fourmers_expected, contig3_fourmers_observed):
     assert int(i) == j
 
@@ -140,16 +142,27 @@ assert np.array_equal(contignames, ['Sequence1_100nt_no_special',
 
 assert np.all(contiglengths == np.array([len(i) for i in contigs if len(i) >= 100]))
 '''
-bigpath = os.path.join(parentdir, 'test', 'data', 'bigfasta.fna.gz')
+#bigpath = os.path.join(parentdir, 'test', 'data', 'bigfasta.fna.gz')
+bigpath =os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')
+begintime= time.time()
 with vamb.vambtools.Reader(bigpath) as f:
-    tnf= vamb.parsecontigs.Composition.from_file(f, use_pc= True).matrix
+    tnf= vamb.parsecontigs_parallel.Composition.from_file(f, use_pc= False).matrix
     f.close()
-
+elapsed = round(time.time() - begintime, 2)
+print("Time for parallel:", elapsed)
+begintime= time.time()
+with vamb.vambtools.Reader(bigpath) as f:
+    tnf2= vamb.parsecontigs.Composition.from_file(f, use_pc= False).matrix
+    f.close()
+elapsed = round(time.time() - begintime, 2)
+print("Time for sequential:", elapsed)
+print(np.where(tnf!=tnf2))
+num_threads = threading.active_count()
+print(f"Numero totale di threads attivi: {num_threads}")
 #target_tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
-    
+'''
 paths = [fasta_path, bigpath]
-paths =[fasta_path]
 backup_iteration=9
 index_list_one = list(range(backup_iteration))
 random.shuffle(index_list_one)
@@ -185,7 +198,7 @@ print("finals:", tnf.shape)
 print(contignames.shape)
 print(contiglengths.shape)
 composition.save('./data/joined_composition')
-'''
+
 b=True
 for path in paths:
     print("Examining:", path)
@@ -202,4 +215,5 @@ for path in paths:
         contiglengths = composition.metadata.lengths
         print(contiglengths[-1])
         print(temp.metadata.lengths[-1])
-        file.close()'''
+        file.close()
+'''
