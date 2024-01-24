@@ -481,7 +481,6 @@ class Composition:
                     else:
                         mutated_arr.shape = (-1, mutated_count[i], 3 * 2**k)
                 # AllAugmentation','GaussianNoise','Transition','Transversion','Mutation'
-                print("gaussian")
                 for j2 in range(gaussian_count[i]):
                     gaussian_save = gaussian_arr[:,j2,:]
                     filepath = f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_GaussianNoise_{j2}.npz"
@@ -501,8 +500,6 @@ class Composition:
                         else:
                             _np.savez(filepath, gaussian_save)
                     index += 1
-                print(index)
-                print("transition")
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
                     filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Transition_{j2}.npz"
@@ -522,8 +519,6 @@ class Composition:
                         else:
                             _np.savez(filepath, trans_save)
                     index += 1
-                print(index)
-                print("_Transversion_")
 
                 for j2 in range(traver_count[i]):
                     traver_save = traver_arr[:,j2,:]
@@ -544,8 +539,7 @@ class Composition:
                         else:
                             _np.savez(filepath, traver_save)
                     index += 1
-                print(index)
-                print("Mutation")
+
                 for j2 in range(mutated_count[i]):
                     mutated_save = mutated_arr[:,j2,:]
                     filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Mutation_{j2}.npz"
@@ -565,7 +559,6 @@ class Composition:
                         else:
                             _np.savez(filepath, mutated_save)
                     index += 1
-                print(index)
 
                 gaussian.clear()
                 trans.clear()
