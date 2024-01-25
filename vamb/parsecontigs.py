@@ -397,8 +397,8 @@ class Composition:
 
                     if skip:
                         continue
-                    t = 0
-                    q = 0
+                    t = _np.empty(0, dtype=_np.int32) 
+                    q = _np.empty(0, dtype=_np.int32) 
                     if not use_pc:
                         t = entry.kmercounts(k)
                     else:
