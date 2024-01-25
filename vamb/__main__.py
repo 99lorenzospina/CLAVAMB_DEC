@@ -66,7 +66,10 @@ def calc_tnf(
     begintime = time.time()/60
     log("\nLoading TNF/PC", logfile, 0)
     log(f"Minimum sequence length: {mincontiglength}", logfile, 1)
-
+    if use_pc:
+        log(f"Using pcmers", logfile, 1)
+    else:
+        log(f"Using kmers", logfile, 1)
     if npzpath is not None:
         log(f"Loading composition from npz {npzpath}", logfile, 1)
         composition = vamb.parsecontigs.Composition.load(npzpath)
@@ -593,7 +596,7 @@ def run(
             logfile,
         )
         return None
-    log(f"\nTNF and coabundances generated in {time_generating_input} minutes", logfile, 1)
+    log(f"\nTNF/PC and coabundances generated in {time_generating_input} minutes", logfile, 1)
 
     # Estimate the number of clusters
     if nlatent_aae_y == None:

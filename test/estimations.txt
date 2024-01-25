@@ -11,3 +11,15 @@ CPU Efficiency: 87.87% of 12:53:44 core-walltime
 Job Wall-clock time: 01:36:43
 Memory Utilized: 13.26 GB (estimated maximum)
 Memory Efficiency: 84.89% of 15.62 GB (1.95 GB/core)
+
+Job ID: 1393276
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Nodes: 1
+Cores per node: 5
+CPU Utilized: 04:27:42
+CPU Efficiency: 87.01% of 05:07:40 core-walltime
+Job Wall-clock time: 01:01:32
+Memory Utilized: 5.62 GB (estimated maximum)
+Memory Efficiency: 43.24% of 13.00 GB (13.00 GB/node)

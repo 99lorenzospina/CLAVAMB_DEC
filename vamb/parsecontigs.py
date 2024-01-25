@@ -185,9 +185,9 @@ class Composition:
         return _np.dot(fourmers, kernel)
 
     @staticmethod
-    def _convert(raw: _vambtools.PushArray, projected: _vambtools.PushArray): #change this in order to move from TNF to new representation
+    def _convert(raw: _vambtools.PushArray, projected: _vambtools.PushArray):
         "Move data from raw _vambtools.PushArray to projected _vambtools.PushArray, converting it."
-        raw_mat = raw.take().reshape(-1, 256) #I impose only 256 colmumns, so every row is a single kmer-vector
+        raw_mat = raw.take().reshape(-1, 256) #I impose only 4^4=256 colmumns, so every row is a single kmer-vector
         projected_mat = Composition._project(raw_mat)
         projected.extend(projected_mat.ravel())
         raw.clear()
@@ -199,7 +199,24 @@ class Composition:
       raw_mat *= 1/s
       raw_mat += -(1/(4**k))  #raw_mat is still with 256 columns
       return _np.dot(raw_mat, kernel)  #dimensions: "-1"x103, every row is a kmer encoded
+    
+    @staticmethod
+    def _pc_project(fourmers:_np.ndarray) ->_np.ndarray:
+        s = fourmers.sum(axis=1).reshape(-1, 1) #sum the content of each row, encolumn the results, the number of rows is the same as before
+        s[s == 0] = 1.0
+        fourmers *= 1 / s
+        fourmers += -(1 / 48)
+        return fourmers
 
+    @staticmethod
+    def _pc_convert_and_project_mat(pc, projected, k=4):
+      pc_mat = pc.take().reshape(-1, 48)
+      s = pc_mat.sum(axis=1).reshape(-1, 1)
+      s[s == 0] = 1.0
+      pc_mat *= 1/s
+      pc_mat += -(1/(3*2**k))  #raw_mat is still with 48 columns
+      projected.extend(pc_mat.ravel())
+      pc.clear()
 
     @classmethod
     def concatenate(cls:type[C], first, second):
@@ -244,37 +261,38 @@ class Composition:
             mask.append(not skip)
             if skip:
                 continue
-
-            raw.extend(entry.kmercounts(k))
-
-            if len(raw) > 256000:
-                Composition._convert(raw, projected)
+            if not use_pc:
+                raw.extend(entry.kmercounts(k))
+                if len(raw) > 256000:
+                    Composition._convert(raw, projected)
+            else:
+                pc.extend(entry.pcmercounts(k))
+                if len(pc) > 48000:
+                    Composition._pc_convert_and_project_mat(pc, projected)
 
             lengths.append(len(entry))
             contignames.append(entry.header)
-
-            pc.extend(entry.pcmercounts(k))
-
-        # Convert rest of contigs
-        Composition._convert(raw, projected)
-        tnfs_arr = projected.take()
-
-        pcs_arr = pc.take()
-
-        # Don't use reshape since it creates a new array object with shared memory
-        tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
+        
         lengths_arr = lengths.take()
 
-        if use_pc:
-            tnfs_arr = pcs_arr #if I want to use pcmer instead of kmer
-            tnfs_arr.shape = (len(lengths_arr), len(tnfs_arr) // len(lengths_arr))
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
             lengths_arr,
            _np.array(mask, dtype=bool),
             minlength,
         )
-        return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
+        # Convert rest of contigs
+        if not use_pc:
+            Composition._convert(raw, projected)
+            tnfs_arr = projected.take()
+            # Don't use reshape since it creates a new array object with shared memory
+            tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
+            return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
+        else:
+            Composition._pc_convert_and_project_mat(pc, projected)
+            pcs_arr = pc.take()
+            pcs_arr.shape = (len(lengths_arr), len(pcs_arr) // len(lengths_arr))
+            return cls(metadata, pcs_arr)  #return a new instance of composition, having metadata as data and pcs_arr as matrix
 
     @classmethod
     def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, index_list=None, store_dir="./", backup_iteration=18, augmode=[-1,-1], use_pc = False, already = False):
@@ -379,22 +397,25 @@ class Composition:
 
                     if skip:
                         continue
-
-                    t = entry.kmercounts(k)
-                    q = entry.pcmercounts(k)
+                    t = 0
+                    q = 0
+                    if not use_pc:
+                        t = entry.kmercounts(k)
+                    else:
+                        q = entry.pcmercounts(k)
                     # t_norm = t / _np.sum(t)
                     # _np.add(t_norm, - 1/(2*4**k), out=t_norm)
                     # print(t_norm)
                     #print(t)
                     if i == 0 and i2 == 0:
-                        norm.extend(t)
-                        #if len(norm) > 256000:
-                        #    Composition._convert(norm, projected)
-                        pc.extend(q)
+                        if not use_pc:
+                            norm.extend(t)
+                        else:
+                            pc.extend(q)
 
                     for j in range(gaussian_count[i]):
-                        t_gaussian = mimics.add_noise(t)
                         if not use_pc:
+                            t_gaussian = mimics.add_noise(t)
                             gaussian.extend(t_gaussian)
                         else:
                             gaussian.extend(mimics.add_noise(q))
@@ -496,9 +517,10 @@ class Composition:
                         gaussian_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
-                            _np.savez(filepath, _np.concatenate((existing_data, gaussian_save), axis=0))
+                            new_data = Composition._pc_project(gaussian_save)
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
-                            _np.savez(filepath, gaussian_save)
+                            _np.savez(filepath, Composition._pc_project(gaussian_save))
                     index += 1
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
@@ -515,9 +537,10 @@ class Composition:
                         trans_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
-                            _np.savez(filepath, _np.concatenate((existing_data, trans_save), axis=0))
+                            new_data = Composition._pc_project(trans_save)
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
-                            _np.savez(filepath, trans_save)
+                            _np.savez(filepath, Composition._pc_project(trans_save))
                     index += 1
 
                 for j2 in range(traver_count[i]):
@@ -535,9 +558,10 @@ class Composition:
                         traver_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
-                            _np.savez(filepath, _np.concatenate((existing_data, traver_save), axis=0))
+                            new_data = Composition._pc_project(traver_save)
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
-                            _np.savez(filepath, traver_save)
+                            _np.savez(filepath, Composition._pc_project(traver_save))
                     index += 1
 
                 for j2 in range(mutated_count[i]):
@@ -555,9 +579,10 @@ class Composition:
                         mutated_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
-                            _np.savez(filepath, _np.concatenate((existing_data, mutated_save), axis=0))
+                            new_data = Composition._pc_project(mutated_save)
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
-                            _np.savez(filepath, mutated_save)
+                            _np.savez(filepath, Composition._pc_project(mutated_save))
                     index += 1
 
                 gaussian.clear()
@@ -572,12 +597,12 @@ class Composition:
             #Composition._convert(norm, projected)
             norm_arr = norm.take()  #projected.take
             norm_arr.shape = (-1, 4**k)
-
             norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
         
         else:
             norm_arr = pc.take()   #to take pcmer instead of tnfs
             norm_arr.shape = (-1, 3 * 2**k)
+            norm_arr = Composition._pc_project(norm_arr)
 
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
