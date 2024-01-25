@@ -290,7 +290,7 @@ class Composition:
             return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
         else:
             Composition._pc_convert_and_project_mat(pc, projected)
-            pcs_arr = pc.take()
+            pcs_arr = projected.take()
             pcs_arr.shape = (len(lengths_arr), len(pcs_arr) // len(lengths_arr))
             return cls(metadata, pcs_arr)  #return a new instance of composition, having metadata as data and pcs_arr as matrix
 
