@@ -373,7 +373,7 @@ def trainaae(
             modelpath = os.path.join(outdir, 'aae_model.pt')
             aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
         else:
-            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_aae.pt")
+            modelpath = os.path.join(outdir, 'aae_model.pt')
             log("Loaded AAE", logfile, 1)
             aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=False)
             aae.to(('cuda' if cuda else 'cpu'))
