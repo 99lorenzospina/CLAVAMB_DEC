@@ -235,10 +235,10 @@ class FastaEntry:
         if global_separator == 'C':
             identifier, description = self._verify_header(header)
         else:
-            identifier = header
-            description = ''
-        self.identifier: str = str(identifier)
-        self.description: str = str(description)
+            identifier = header.decode('utf-8')
+            description = ""
+        self.identifier: str = identifier
+        self.description: str = description
         masked = sequence.translate(None, b" \t\n\r")
         stripped = masked.translate(None, self.allowed)
         if len(stripped) > 0:
