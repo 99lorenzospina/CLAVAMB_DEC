@@ -24,6 +24,7 @@ from typing import Optional, IO
 import warnings
 from glob import glob
 import random
+from vamb.global_variables import global_separator
 
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
@@ -1148,6 +1149,7 @@ def main():
     minsize: int = args.minsize
     maxclusters: Optional[int] = args.maxclusters
     separator: Optional[str] = args.separator
+    global_separator = separator
 
     contrastive: bool = (args.contrastive_vae) ^ (args.contrastive_aae)
     

@@ -13,6 +13,7 @@ from hashlib import md5 as _md5
 from collections.abc import Iterable, Iterator, Generator
 from typing import Optional, IO, Union
 from pathlib import PurePath as _PurePath
+from vamb.global_variables import global_separator
 
 
 class PushArray:
@@ -229,7 +230,13 @@ class FastaEntry:
         return (identifier.decode(), description)
 
     def __init__(self, header: bytes, sequence: bytearray):
-        identifier, description = self._verify_header(header)
+        identifier = None
+        description = None
+        if global_separator == 'C':
+            identifier, description = self._verify_header(header)
+        else:
+            identifier = header
+            description = ''
         self.identifier: str = identifier
         self.description: str = description
         masked = sequence.translate(None, b" \t\n\r")
