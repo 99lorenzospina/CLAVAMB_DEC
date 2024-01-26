@@ -237,8 +237,8 @@ class FastaEntry:
         else:
             identifier = header
             description = ''
-        self.identifier: str = identifier
-        self.description: str = description
+        self.identifier: str = str(identifier)
+        self.description: str = str(description)
         masked = sequence.translate(None, b" \t\n\r")
         stripped = masked.translate(None, self.allowed)
         if len(stripped) > 0:
