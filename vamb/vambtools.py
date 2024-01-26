@@ -480,7 +480,7 @@ def write_bins(
     Inputs:
         directory: Directory to create or put files in
         bins: dict[str: set[str]] (can be loaded from
-        clusters.tsv using vamb.cluster.read_clusters)
+        clusters.tsv using vamb.vambtools.read_clusters)
         fastaio: bytes iterator containing FASTA file with all sequences
         maxbins: None or else raise an error if trying to make more bins than this [250]
         minsize: Minimum number of nucleotides in cluster to be output [0]

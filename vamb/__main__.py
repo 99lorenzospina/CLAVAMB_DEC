@@ -28,6 +28,8 @@ import random
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
 
+LOAD_MOD = True
+
 # These MUST be set before importing numpy
 # I know this is a shitty hack, see https://github.com/numpy/numpy/issues/11826
 os.environ["MKL_NUM_THREADS"] = str(DEFAULT_THREADS)
@@ -266,7 +268,7 @@ def trainvae(
     print("", file=logfile)
 
     if contrastive:
-        if True:
+        if not LOAD_MOD:
             vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent,alpha=alpha, beta=beta, dropout=dropout, cuda=cuda, c=True)
             log("Created VAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
@@ -277,10 +279,16 @@ def trainvae(
             log("Loaded VAE", logfile, 1)
             vae.to(('cuda' if cuda else 'cpu'))
     else:
-        vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent, alpha=alpha, beta=beta, dropout=dropout, cuda=cuda)
-        log("Created VAE", logfile, 1)
-        modelpath = os.path.join(outdir, 'vae_model.pt')
-        vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
+        if not LOAD_MOD:
+            vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent, alpha=alpha, beta=beta, dropout=dropout, cuda=cuda)
+            log("Created VAE", logfile, 1)
+            modelpath = os.path.join(outdir, 'vae_model.pt')
+            vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
+        else:
+            modelpath = os.path.join(outdir, "vae_model.pt")
+            vae = vamb.encode.VAE.load(modelpath,cuda=cuda,c=False)
+            log("Loaded VAE", logfile, 1)
+            vae.to(('cuda' if cuda else 'cpu'))
 
     print("", file=logfile)
     log("Encoding to latent representation", logfile, 1)
@@ -348,7 +356,7 @@ def trainaae(
     print("", file=logfile)
 
     if contrastive:
-        if True:
+        if not LOAD_MOD:
             aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, k=k, contrast=True)
             log("Created AAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
@@ -359,10 +367,16 @@ def trainaae(
             aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=True)
             aae.to(('cuda' if cuda else 'cpu'))
     else:
-        aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, contrast=False)
-        log("Created AAE", logfile, 1)
-        modelpath = os.path.join(outdir, 'aae_model.pt')
-        aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
+        if not LOAD_MOD:
+            aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, contrast=False)
+            log("Created AAE", logfile, 1)
+            modelpath = os.path.join(outdir, 'aae_model.pt')
+            aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath)
+        else:
+            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_aae.pt")
+            log("Loaded AAE", logfile, 1)
+            aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=False)
+            aae.to(('cuda' if cuda else 'cpu'))
     
     print("", file=logfile)
     log("Encoding to latent representation", logfile, 1)

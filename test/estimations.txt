@@ -12,3 +12,22 @@ Job Wall-clock time: 01:36:43
 Memory Utilized: 13.26 GB (estimated maximum)
 Memory Efficiency: 84.89% of 15.62 GB (1.95 GB/core)
 
+setting nclusters as 2973
+Job ID: 1393374 estimate k for airways with pc+Abundance
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Nodes: 1
+Cores per node: 5
+CPU Utilized: 03:13:51
+CPU Efficiency: 95.10% of 03:23:50 core-walltime
+Job Wall-clock time: 00:40:46
+Memory Utilized: 5.49 GB (estimated maximum)
+Memory Efficiency: 42.25% of 13.00 GB (13.00 GB/node)
+
+airways__TNFabundance__contrastive yykd
+airways__TNFabundance__contrastive__estimatek yyke
+airways__TNFabundance__contrastive__estimatek__noGPU ynke
+airways__TNFabundance__nocontrastive    nykd
+airways__TNFabundance__nocontrastive__estimatek nyke
+airways__TNFabundance__nocontrastive__estimatek__noGPU nnke
