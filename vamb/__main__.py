@@ -274,7 +274,7 @@ def trainvae(
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
             vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
         else:
-            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_vae.pt")
+            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]}_vae.pt")
             vae = vamb.encode.VAE.load(modelpath,cuda=cuda,c=True)
             log("Loaded VAE", logfile, 1)
             vae.to(('cuda' if cuda else 'cpu'))
@@ -362,7 +362,7 @@ def trainaae(
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
             aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
         else:
-            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]+' '+str(hparams.hidden_mlp)}_aae.pt")
+            modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+' '+aug_all_method[hparams.augmode[1]]}_aae.pt")
             log("Loaded AAE", logfile, 1)
             aae = vamb.aamb_encode.AAE.load(modelpath,cuda=cuda,c=True)
             aae.to(('cuda' if cuda else 'cpu'))
