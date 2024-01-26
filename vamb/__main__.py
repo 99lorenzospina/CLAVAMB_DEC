@@ -208,6 +208,8 @@ def calc_rpkm(
             shutil.rmtree(dumpdirectory)
 
     if len(rpkms) != ncontigs:
+        print(len(rpkms))
+        print(ncontigs)
         raise ValueError("Length of TNFs and length of RPKM does not match. Verify the inputs")
 
     elapsed = round(time.time() - begintime, 2)
@@ -891,8 +893,8 @@ def main():
         dest="minlength",
         metavar="",
         type=int,
-        default=250,
-        help="ignore contigs shorter than this [250]",
+        default=100,
+        help="ignore contigs shorter than this [100]",
     )
     inputos.add_argument(
         "-z",
@@ -1260,8 +1262,8 @@ def main():
         )
 
     ####################### CHECK ARGUMENTS FOR TNF AND BAMFILES ###########
-    if minlength < 250:
-        raise argparse.ArgumentTypeError("Minimum contig length must be at least 250")
+    if minlength < 100:
+        raise argparse.ArgumentTypeError("Minimum contig length must be at least 100")
 
     if not isfinite(minid) or minid < 0.0 or minid > 1.0:
         raise argparse.ArgumentTypeError("Minimum nucleotide ID must be in [0,1]")
