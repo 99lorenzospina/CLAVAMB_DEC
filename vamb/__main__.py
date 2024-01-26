@@ -161,7 +161,7 @@ def calc_rpkm(
         if len(rpkmpath) == 1:
             log('Loading RPKM from npz array {}'.format(rpkmpath[0]), logfile, 1)
             rpkms = vamb.vambtools.read_npz(rpkmpath[0])
-
+            #rpkms = vamb.parsebam.avg_window(rpkms)    #only if I want to keep the size 10 for every dataset
             if not rpkms.dtype == np.float32:
                 raise ValueError('RPKMs .npz array must be of float32 dtype')
         #multiple files in input (multiple datasets)
