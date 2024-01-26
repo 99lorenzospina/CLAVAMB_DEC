@@ -85,10 +85,10 @@ def calc_tnf(
             index_list_two = list(range(backup_iteration))
             random.shuffle(index_list_two)
             index_list = [index_list_one, index_list_two]
-        if isinstance(fastapath, str):
-            log(f"Loading data from FASTA file {fastapath}", logfile, 1)
+        if len(fastapath) == 1:
+            log(f"Loading data from FASTA file {fastapath[0]}", logfile, 1)
             if not contrastive:
-                with vamb.vambtools.Reader(fastapath) as file:
+                with vamb.vambtools.Reader(fastapath[0]) as file:
                     composition = vamb.parsecontigs.Composition.from_file(
                         file, minlength=mincontiglength, use_pc = use_pc
                     )
@@ -96,7 +96,7 @@ def calc_tnf(
             else:
                 os.system(f'mkdir -p {augmentation_store_dir}')
                 log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
-                with vamb.vambtools.Reader(fastapath) as file:
+                with vamb.vambtools.Reader(fastapath[0]) as file:
                     composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
                         file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
                     file.close()
@@ -158,9 +158,9 @@ def calc_rpkm(
     log('\nLoading RPKM', logfile)
     # If rpkm is given, we load directly from .npz file
     if rpkmpath is not None:
-        if isinstance(rpkmpath, str):
-            log('Loading RPKM from npz array {}'.format(rpkmpath), logfile, 1)
-            rpkms = vamb.vambtools.read_npz(rpkmpath)
+        if len(rpkmpath) == 1:
+            log('Loading RPKM from npz array {}'.format(rpkmpath[0]), logfile, 1)
+            rpkms = vamb.vambtools.read_npz(rpkmpath[0])
 
             if not rpkms.dtype == np.float32:
                 raise ValueError('RPKMs .npz array must be of float32 dtype')
@@ -489,7 +489,10 @@ def write_fasta(
     keep: set[str] = set()
     for contigs in filtered_clusters.values():
         keep.update(set(contigs))
- 
+    
+    if len(fastapath) == 1:
+        fastapath = fastapath[0]    #if I gave more dataset in input, I have to create the else
+    
     with vamb.vambtools.Reader(fastapath) as file:
         vamb.vambtools.write_bins(
             os.path.join(outdir, "bins"), filtered_clusters, file, maxbins=None, separator=separator
