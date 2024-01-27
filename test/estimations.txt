@@ -37,3 +37,14 @@ Job Wall-clock time: 01:22:41
 Memory Utilized: 1.59 GB
 Memory Efficiency: 12.20% of 13.00 GB
 
+setting nclusters as 1311 estimate k for urog with pc+Abundance
+Job ID: 1393700
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:06:17
+CPU Efficiency: 98.18% of 00:06:24 core-walltime
+Job Wall-clock time: 00:06:24
+Memory Utilized: 518.02 MB
+Memory Efficiency: 3.89% of 13.00 GB
