@@ -208,8 +208,6 @@ def calc_rpkm(
             shutil.rmtree(dumpdirectory)
 
     if len(rpkms) != ncontigs:
-        print(len(rpkms))
-        print(ncontigs)
         raise ValueError("Length of TNFs and length of RPKM does not match. Verify the inputs")
 
     elapsed = round(time.time() - begintime, 2)

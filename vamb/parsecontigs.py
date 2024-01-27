@@ -274,9 +274,6 @@ class Composition:
             contignames.append(entry.header)
         
         lengths_arr = lengths.take()
-        print("contignames length, ", len(_np.array(contignames, dtype=object)))
-        print("lengths length, ", len(lengths_arr))
-        print("mask length, ", len(_np.array(mask, dtype=bool)))
         
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),
@@ -290,7 +287,6 @@ class Composition:
             tnfs_arr = projected.take()
             # Don't use reshape since it creates a new array object with shared memory
             tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
-            print("tnfs length, ", len(tnfs_arr))
             return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
         else:
             Composition._pc_convert_and_project_mat(pc, projected)
