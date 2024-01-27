@@ -252,7 +252,10 @@ class FastaEntry:
 
     @property
     def header(self) -> str:
-        return self.identifier + self.description
+        header = self.identifier + self.description
+        if header.endswith('\n'):
+            header = header[:-1]
+        return header
 
     def rename(self, header: bytes) -> None:
         identifier, description = self._verify_header(header)
