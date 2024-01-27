@@ -48,3 +48,87 @@ CPU Efficiency: 98.18% of 00:06:24 core-walltime
 Job Wall-clock time: 00:06:24
 Memory Utilized: 518.02 MB
 Memory Efficiency: 3.89% of 13.00 GB
+
+setting nclusters as 1470 for gi pc+Abundance
+Job ID: 1393701
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:09:35
+CPU Efficiency: 98.80% of 00:09:42 core-walltime
+Job Wall-clock time: 00:09:42
+Memory Utilized: 608.04 MB
+Memory Efficiency: 4.57% of 13.00 GB
+
+setting nclusters as 1531 for gi tnf+Abundance
+Job ID: 1393660
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:16:06
+CPU Efficiency: 99.08% of 00:16:15 core-walltime
+Job Wall-clock time: 00:16:15
+Memory Utilized: 932.38 MB
+Memory Efficiency: 7.00% of 13.00 GB
+
+setting nclusters as 2995 for oral pc+Abundance
+Job ID: 1393702
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:47:08
+CPU Efficiency: 99.51% of 00:47:22 core-walltime
+Job Wall-clock time: 00:47:22
+Memory Utilized: 1.16 GB
+Memory Efficiency: 8.91% of 13.00 GB
+
+setting nclusters as 3310 for oral tnf+Abundance
+Job ID: 1393662
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 01:23:24
+CPU Efficiency: 99.27% of 01:24:01 core-walltime
+Job Wall-clock time: 01:24:01
+Memory Utilized: 1.77 GB
+Memory Efficiency: 13.64% of 13.00 GB
+
+setting nclusters as 3257 for skin pc+Abundance
+Job ID: 1393698
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:43:10
+CPU Efficiency: 98.93% of 00:43:38 core-walltime
+Job Wall-clock time: 00:43:38
+Memory Utilized: 972.96 MB
+Memory Efficiency: 7.31% of 13.00 GB
+
+setting nclusters as 3601 for skin tnf+Abundance
+Job ID: 1393663
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 01:22:04
+CPU Efficiency: 99.25% of 01:22:41 core-walltime
+Job Wall-clock time: 01:22:41
+Memory Utilized: 1.59 GB
+Memory Efficiency: 12.20% of 13.00 GB
+
+setting nclusters as 1352 for urog tnf+Abundace
+Job ID: 1393664
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:09:44
+CPU Efficiency: 98.65% of 00:09:52 core-walltime
+Job Wall-clock time: 00:09:52
+Memory Utilized: 726.17 MB
+Memory Efficiency: 5.46% of 13.00 GB

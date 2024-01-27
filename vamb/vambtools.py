@@ -474,7 +474,6 @@ def read_clusters(filehandle: Iterable[str], min_size: int =1) -> dict[str, set[
 
     contigsof_dict = {cl: co for cl, co in contigsof.items() if len(co) >= min_size}
 
-    print(contigsof_dict)
     return contigsof_dict
 
 
@@ -521,7 +520,7 @@ def write_bins(
 
     byteslen_by_id: dict[str, tuple[bytes, int]] = dict()
     for entry in byte_iterfasta(fastaio):
-        byteslen_by_id[entry.identifier] = (
+        byteslen_by_id[entry.header] = (    #changing from entry.identifier to entry.header
             _gzip.compress(entry.format().encode(), compresslevel=1),
             len(entry),
         )
@@ -533,6 +532,10 @@ def write_bins(
         pass
     except:
         raise
+    
+    import pickle
+    with open(_os.path.join(directory, 'byteslen_by_id.pickle'), 'wb') as file:
+        pickle.dump(byteslen_by_id, file)
 
     # Now actually print all the contigs to files
     for binname, contigs in bins.items():

@@ -475,7 +475,6 @@ def write_fasta(
     assert len(contignames) == len(contiglengths)
 
     lengthof = dict(zip(contignames, contiglengths))
-    print(lengthof)
     filtered_clusters: dict[str, set[str]] = dict()
 
     with open(clusterspath) as file:
@@ -702,7 +701,7 @@ def run(
 
     comp_metadata.filter_mask(mask)  # type: ignore
     # Write contignames and contiglengths needed for dereplication purposes 
-    np.savetxt(os.path.join(outdir,'contignames'),comp_metadata.identifiers, fmt='%s')
+    np.savetxt(os.path.join(outdir,'contignames.txt'),comp_metadata.identifiers, fmt='%s')
     np.savez(os.path.join(outdir,'lengths.npz'),comp_metadata.lengths)
     
     if 'vae' in model_selection:
