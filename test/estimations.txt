@@ -25,9 +25,15 @@ Job Wall-clock time: 00:40:46
 Memory Utilized: 5.49 GB (estimated maximum)
 Memory Efficiency: 42.25% of 13.00 GB (13.00 GB/node)
 
-airways__TNFabundance__contrastive yykd
-airways__TNFabundance__contrastive__estimatek yyke
-airways__TNFabundance__contrastive__estimatek__noGPU ynke
-airways__TNFabundance__nocontrastive    nykd
-airways__TNFabundance__nocontrastive__estimatek nyke
-airways__TNFabundance__nocontrastive__estimatek__noGPU nnke
+Job ID: 1393663 estimate k for skin with tnf+Abundance
+setting nclusters as 3601
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 01:22:04
+CPU Efficiency: 99.25% of 01:22:41 core-walltime
+Job Wall-clock time: 01:22:41
+Memory Utilized: 1.59 GB
+Memory Efficiency: 12.20% of 13.00 GB
+

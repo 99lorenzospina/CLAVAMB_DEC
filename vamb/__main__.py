@@ -481,8 +481,8 @@ def write_fasta(
     with open(clusterspath) as file:
         clusters = vamb.vambtools.read_clusters(file)
 
-    log("Length of clusters: " + len(clusters), logfile, 1)
-    log("Length of contigs" + len(contigs), logfile, 1)
+    log("Length of clusters: " + str(len(clusters)), logfile, 1)
+    log("Length of contigs" + str(len(contigs)), logfile, 1)
 
     for cluster, contigs in clusters.items():
         size = sum(lengthof[contig] for contig in contigs)
