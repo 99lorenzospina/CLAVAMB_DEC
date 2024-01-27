@@ -471,6 +471,7 @@ def read_clusters(filehandle: Iterable[str], min_size: int =1) -> dict[str, set[
 
     contigsof_dict = {cl: co for cl, co in contigsof.items() if len(co) >= min_size}
 
+    print(contigsof_dict)
     return contigsof_dict
 
 
