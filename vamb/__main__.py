@@ -475,6 +475,7 @@ def write_fasta(
     assert len(contignames) == len(contiglengths)
 
     lengthof = dict(zip(contignames, contiglengths))
+    print(lengthof)
     filtered_clusters: dict[str, set[str]] = dict()
 
     with open(clusterspath) as file:
