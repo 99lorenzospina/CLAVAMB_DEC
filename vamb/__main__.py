@@ -701,7 +701,8 @@ def run(
 
     comp_metadata.filter_mask(mask)  # type: ignore
     # Write contignames and contiglengths needed for dereplication purposes 
-    np.savetxt(os.path.join(outdir,'contignames.txt'),comp_metadata.identifiers, fmt='%s')
+    print("Length of contignames: ", len(comp_metadata.identifiers))
+    np.savetxt(os.path.join(outdir,'contignames'),comp_metadata.identifiers, fmt='%s')
     np.savez(os.path.join(outdir,'lengths.npz'),comp_metadata.lengths)
     
     if 'vae' in model_selection:

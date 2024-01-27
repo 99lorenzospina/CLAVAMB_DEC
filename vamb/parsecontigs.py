@@ -281,6 +281,7 @@ class Composition:
            _np.array(mask, dtype=bool),
             minlength,
         )
+        print("Length of composition.contignames when it's created: ", len(_np.array(contignames, dtype=object)))
         # Convert rest of contigs
         if not use_pc:
             Composition._convert(raw, projected)
