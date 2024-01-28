@@ -743,7 +743,7 @@ class VAE(_nn.Module):
         # Get number of features
         # Following line is un-inferrable due to typing problems with DataLoader
         ncontigs, nsamples = dataloader.dataset.tensors[0].shape  # type: ignore
-        depthstensor, tnftensor, _ = dataloader.dataset.tensors
+        depthstensor, tnftensor, _, _ = dataloader.dataset.tensors
 
         if logfile is not None:
             print("\tNetwork properties:", file=logfile)
