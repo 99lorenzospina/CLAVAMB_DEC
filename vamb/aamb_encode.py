@@ -641,7 +641,7 @@ class AAE(nn.Module):
     
     def trainmodel(
         self, data_loader, T=0.1596, nepochs=320, lrate=1e-3,
-                   batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None, mask=None
+                   batchsteps=[25, 75, 150, 300], logfile=None, modelfile=None, hparams=None, augmentationpath=None,
     ):
 
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
@@ -760,9 +760,6 @@ class AAE(nn.Module):
               aug_tensor1, aug_tensor2 = 0, 0
               while(torch.sum(torch.sub(aug_tensor1, aug_tensor2))==0):
                   aug_arr1, aug_arr2 = vamb.vambtools.read_npz(aug_archive1_file[0]), vamb.vambtools.read_npz(aug_archive2_file[0])
-                  '''Mutate rpkm and tnf array in-place instead of making a copy.'''
-                  aug_arr1 = vamb.vambtools.numpy_inplace_maskarray(aug_arr1, mask)
-                  aug_arr2 = vamb.vambtools.numpy_inplace_maskarray(aug_arr2, mask)
                   '''Zscore for augmentation data (same as the depth and tnf)'''
                   vamb.vambtools.zscore(aug_arr1, axis=0, inplace=True)
                   vamb.vambtools.zscore(aug_arr2, axis=0, inplace=True)

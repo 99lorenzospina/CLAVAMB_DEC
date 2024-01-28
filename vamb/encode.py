@@ -45,25 +45,22 @@ def make_dataloader(
     batchsize: int = 256,
     destroy: bool = False,
     cuda: bool = False,
-) -> tuple[_DataLoader[tuple[Tensor, Tensor, Tensor]], _np.ndarray]:
-    """Create a DataLoader and a contig mask from RPKM and TNF.
+) -> _DataLoader:
+    """Create a DataLoader from RPKM, TNF and lengths.
 
     The dataloader is an object feeding minibatches of contigs to the VAE.
-    The data are normalized versions of the input datasets, with zero-contigs,
-    i.e. contigs where a row in either TNF or RPKM are all zeros, removed.
-    The mask is a boolean mask designating which contigs have been kept.
+    The data are normalized versions of the input datasets.
 
     Inputs:
         rpkm: RPKM matrix (N_contigs x N_samples)
         tnf: TNF matrix (N_contigs x N_TNF)
-        lengths: matrix of lengths of each contig
+        lengths: Numpy array of sequence length (N_contigs)
         batchsize: Starting size of minibatches for dataloader
         destroy: Mutate rpkm and tnf array in-place instead of making a copy.
         cuda: Pagelock memory of dataloader (use when using GPU acceleration)
 
     Outputs:
         DataLoader: An object feeding data to the VAE
-        mask: A boolean mask of which contigs are kept
     """
 
     if not isinstance(rpkm, _np.ndarray) or not isinstance(tnf, _np.ndarray):
@@ -78,7 +75,6 @@ def make_dataloader(
     if not (rpkm.dtype == tnf.dtype == _np.float32):
         raise ValueError("TNF and RPKM must be Numpy arrays of dtype float32")
 
-    ### Copy arrays and mask them ###
     # Copy if not destroy - this way we can have all following operations in-place
     # for simplicity
     if not destroy:
@@ -88,42 +84,28 @@ def make_dataloader(
     # Normalize samples to have same depth
     sample_depths_sum = rpkm.sum(axis=0)
     if _np.any(sample_depths_sum == 0):
-        raise ValueError("One or more samples have zero depth in all sequences, so cannot be depth normalized")
-    rpkm *= 1_000_000 / sample_depths_sum
-
-    # If multiple samples, also include nonzero depth as requirement for accept
-    # of sequences
-    mask = tnf.sum(axis=1) != 0
-    depthssum = None
-    if rpkm.shape[1] > 1:
-        depthssum = rpkm.sum(axis=1)
-        mask &= depthssum != 0
-        depthssum = depthssum[mask]
-        assert isinstance(depthssum, _np.ndarray)
-    
-    if mask.sum() < batchsize:
         raise ValueError(
-            "Fewer sequences left after filtering than the batch size. " +
-            "This probably means you try to run on a too small dataset (below ~10k sequences), " + 
-            "or that nearly all sequences were filtered away. Check the log file, " + 
-            "and verify BAM file content is sensible."
-            )
+            "One or more samples have zero depth in all sequences, so cannot be depth normalized"
+        )
+    rpkm *= 1_000_000 / sample_depths_sum
+    total_abundance = rpkm.sum(axis=1)
 
-    _vambtools.numpy_inplace_maskarray(rpkm, mask)
-    _vambtools.numpy_inplace_maskarray(tnf, mask)
+    # Normalize rpkm to sum to 1
+    n_samples = rpkm.shape[1]
+    zero_total_abundance = total_abundance == 0
+    rpkm[zero_total_abundance] = 1 / n_samples
+    nonzero_total_abundance = total_abundance.copy()
+    nonzero_total_abundance[zero_total_abundance] = 1.0
+    rpkm /= nonzero_total_abundance.reshape((-1, 1))
 
-    # If multiple samples, normalize to sum to 1, else zscore normalize
-    if rpkm.shape[1] > 1:
-        assert depthssum is not None  # we set it so just above
-        rpkm /= depthssum.reshape((-1, 1))
-    else:
-        _vambtools.zscore(rpkm, axis=0, inplace=True)
-
-    # Normalize TNF
+    # Normalize TNF and total abundance to make SSE loss work better
+    total_abundance = _np.log(total_abundance.clip(min=0.001))
+    _vambtools.zscore(total_abundance, inplace=True)
     _vambtools.zscore(tnf, axis=0, inplace=True)
+    total_abundance.shape = (len(total_abundance), 1)
 
     # Create weights
-    lengths = (lengths[mask]).astype(_np.float32)
+    lengths = (lengths).astype(_np.float32)
     weights = _np.log(lengths).astype(_np.float32) - 5.0
     weights[weights < 2.0] = 2.0
     weights *= len(weights) / weights.sum()
@@ -132,19 +114,23 @@ def make_dataloader(
     ### Create final tensors and dataloader ###
     depthstensor = _torch.from_numpy(rpkm)  # this is a no-copy operation
     tnftensor = _torch.from_numpy(tnf)
+    total_abundance_tensor = _torch.from_numpy(total_abundance)
     weightstensor = _torch.from_numpy(weights)
     n_workers = 4 if cuda else 1
-    dataset = _TensorDataset(depthstensor, tnftensor, weightstensor)
+    dataset = _TensorDataset(
+        depthstensor, tnftensor, total_abundance_tensor, weightstensor
+    )
     dataloader = _DataLoader(
         dataset=dataset,
         batch_size=batchsize,
-        drop_last=True,
+        drop_last=False,
         shuffle=True,
         num_workers=n_workers,
         pin_memory=cuda,
     )
 
-    return dataloader, mask
+    return dataloader
+
 
 class AutomaticWeightedLoss(_nn.Module):
     """automatically weighted multi-task loss
@@ -692,7 +678,6 @@ class VAE(_nn.Module):
         modelfile: Union[None, str, IO[bytes]] = None,
         hparams = None,
         augmentationpath = None,
-        mask = None
     ):
         """Train the autoencoder from depths array and tnf array.
 
@@ -705,7 +690,6 @@ class VAE(_nn.Module):
             modelfile: Save models to this file if not None [None]
             hparams: CLMB only. Set the batchsize, augmode, temperature for contrastive learning. See the function (trainvae) in (__main.py__) for value setting. [None]
             augmentationpath: CLMB only. Path to find the augmented data [None]
-            mask: CLMB only. Mask the augmented data to keep nonzero tnfs and rpkm [None]
 
         Output: None
         """
@@ -825,9 +809,6 @@ class VAE(_nn.Module):
                 while(_torch.sum(_torch.sub(aug_tensor1, aug_tensor2))==0):
                     #print(aug_archive1_file[0], " and ", aug_archive2_file[0])
                     aug_arr1, aug_arr2 = _vambtools.read_npz(aug_archive1_file[0]), _vambtools.read_npz(aug_archive2_file[0])
-                    '''Mutate rpkm and tnf array in-place instead of making a copy.'''
-                    aug_arr1 = _vambtools.numpy_inplace_maskarray(aug_arr1, mask)
-                    aug_arr2 = _vambtools.numpy_inplace_maskarray(aug_arr2, mask)
                     '''Zscore for augmentation data (same as the depth and tnf)'''
                     _vambtools.zscore(aug_arr1, axis=0, inplace=True)
                     _vambtools.zscore(aug_arr2, axis=0, inplace=True)

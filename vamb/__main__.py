@@ -257,14 +257,11 @@ def trainvae(
         augdatashuffle = augdatashuffle     # Shuffle the augmented data for training to introduce more noise. Setting True is not recommended. [False]
     )
 
-    dataloader, mask = vamb.encode.make_dataloader(
+    dataloader = vamb.encode.make_dataloader(
         rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
     )
-    log("Created dataloader and mask", logfile, 1)
-    vamb.vambtools.write_npz(os.path.join(outdir, "mask.npz"), mask)
-    n_discarded = len(mask) - mask.sum()
-    log(f"Number of sequences unsuitable for encoding: {n_discarded}", logfile, 1)
-    log(f"Number of sequences remaining: {len(mask) - n_discarded}", logfile, 1)
+    log("Created dataloader", logfile, 1)
+    log(f"Number of sequences used: {len(rpkms)}", logfile, 1)
     print("", file=logfile)
 
     if contrastive:
@@ -272,7 +269,7 @@ def trainvae(
             vae = vamb.encode.VAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, k=k, nhiddens=nhiddens, nlatent=nlatent,alpha=alpha, beta=beta, dropout=dropout, cuda=cuda, c=True)
             log("Created VAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
-            vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
+            vae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath)
         else:
             modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_vae.pt")
             vae = vamb.encode.VAE.load(modelpath,cuda=cuda,c=True)
@@ -299,7 +296,7 @@ def trainvae(
     elapsed = round(time.time()/60 - begintime, 2)
     log(f"Trained VAE and encoded in {elapsed} minutes", logfile, 1)
 
-    return mask, latent
+    return latent
 
 def trainaae(
     outdir: str,
@@ -345,14 +342,11 @@ def trainaae(
     
     assert len(rpkms) == len(tnfs)
 
-    dataloader, mask = vamb.encode.make_dataloader(
+    dataloader = vamb.encode.make_dataloader(
         rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
     )
-    log("Created dataloader and mask", logfile, 1)
-    #vamb.vambtools.write_npz(os.path.join(outdir, "mask.npz"), mask)
-    n_discarded = len(mask) - mask.sum()
-    log(f"Number of sequences unsuitable for encoding: {n_discarded}", logfile, 1)
-    log(f"Number of sequences remaining: {len(mask) - n_discarded}", logfile, 1)
+    log("Created dataloader", logfile, 1)
+    log(f"Number of sequences used: {len(rpkms)}", logfile, 1)
     print("", file=logfile)
 
     if contrastive:
@@ -360,7 +354,7 @@ def trainaae(
             aae = vamb.aamb_encode.AAE(ntnf=int(tnfs.shape[1]), nsamples=nsamples, nhiddens=nhiddens, nlatent_l=nlatent_z, nlatent_y=nlatent_y, alpha=alpha, sl=sl, slr=slr, cuda=cuda, k=k, contrast=True)
             log("Created AAE", logfile, 1)
             modelpath = os.path.join(outdir, f"{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
-            aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath, mask=mask)
+            aae.trainmodel(dataloader, nepochs=nepochs, lrate=lrate, batchsteps=batchsteps, logfile=logfile, modelfile=modelpath, hparams=hparams, augmentationpath=augmentationpath)
         else:
             modelpath = os.path.join(outdir, f"final-dim/{aug_all_method[hparams.augmode[0]]+'_'+aug_all_method[hparams.augmode[1]]}_aae.pt")
             log("Loaded AAE", logfile, 1)
@@ -382,14 +376,14 @@ def trainaae(
     log("Encoding to latent representation", logfile, 1)
     clusters_y_dict,latent = aae.get_latents(contignames, dataloader)
     vamb.vambtools.write_npz(os.path.join(outdir, "aae_z_latent.npz"), latent)
-    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict) #this is computed at the end of cluster()
+    #vamb.vambtools.write_npz(os.path.join(outdir, "aae_y_latent.npz"), clusters_y_dict)
 
     del aae  # Needed to free "latent" array's memory references?
 
     elapsed = round(time.time()/60 - begintime, 2)
     log(f"Trained AAE and encoded in {elapsed} minutes", logfile, 1)
 
-    return mask, latent, clusters_y_dict
+    return latent, clusters_y_dict
 
 
 def cluster(
@@ -578,7 +572,6 @@ def run(
                            contrastive=contrastive,
                            k=k,
                            use_pc = use_pc)
-    
     # Parse BAMs, save as npz
     refhash = None if norefcheck else vamb.vambtools._hash_refnames(composition.metadata.identifiers)
     abundance = calc_rpkm(
@@ -633,7 +626,7 @@ def run(
     if 'vae' in model_selection:
         begin_train_vae=time.time()/60
         # Train, save model
-        mask, latent = trainvae(
+        latent = trainvae(
             outdir,
             abundance,
             composition.matrix,
@@ -663,7 +656,7 @@ def run(
     if 'aae' in model_selection:
         begin_train_aae = time.time()/60
         # Train, save model
-        mask, latent_z, clusters_y_dict = trainaae(
+        latent_z, clusters_y_dict = trainaae(
             outdir,
             abundance,
             composition.matrix,
@@ -696,9 +689,7 @@ def run(
     comp_metadata = composition.metadata
     del composition, abundance
 
-    comp_metadata.filter_mask(mask)  # type: ignore
     # Write contignames and contiglengths needed for dereplication purposes 
-    print("Length of contignames: ", len(comp_metadata.identifiers))
     np.savetxt(os.path.join(outdir,'contignames'),comp_metadata.identifiers, fmt='%s')
     np.savez(os.path.join(outdir,'lengths.npz'),comp_metadata.lengths)
     
@@ -786,6 +777,7 @@ def run(
         log(f"\nAAE z bins written in {writing_bins_time_z} minutes", logfile)
         
         clusterspath= os.path.join(outdir, "aae_y_clusters.tsv") 
+
          # Binsplit if given a separator
         if separator is not None:
             maybe_split = vamb.vambtools.binsplit(clusters_y_dict, separator)
