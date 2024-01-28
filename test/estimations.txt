@@ -25,30 +25,6 @@ Job Wall-clock time: 00:40:46
 Memory Utilized: 5.49 GB (estimated maximum)
 Memory Efficiency: 42.25% of 13.00 GB (13.00 GB/node)
 
-Job ID: 1393663 estimate k for skin with tnf+Abundance
-setting nclusters as 3601
-Cluster: cluster_dei
-User/Group: spinaloren/studenti
-State: COMPLETED (exit code 0)
-Cores: 1
-CPU Utilized: 01:22:04
-CPU Efficiency: 99.25% of 01:22:41 core-walltime
-Job Wall-clock time: 01:22:41
-Memory Utilized: 1.59 GB
-Memory Efficiency: 12.20% of 13.00 GB
-
-setting nclusters as 1311 estimate k for urog with pc+Abundance
-Job ID: 1393700
-Cluster: cluster_dei
-User/Group: spinaloren/studenti
-State: COMPLETED (exit code 0)
-Cores: 1
-CPU Utilized: 00:06:17
-CPU Efficiency: 98.18% of 00:06:24 core-walltime
-Job Wall-clock time: 00:06:24
-Memory Utilized: 518.02 MB
-Memory Efficiency: 3.89% of 13.00 GB
-
 setting nclusters as 1470 for gi pc+Abundance
 Job ID: 1393701
 Cluster: cluster_dei
@@ -132,3 +108,15 @@ CPU Efficiency: 98.65% of 00:09:52 core-walltime
 Job Wall-clock time: 00:09:52
 Memory Utilized: 726.17 MB
 Memory Efficiency: 5.46% of 13.00 GB
+
+setting nclusters as 1311 estimate k for urog with pc+Abundance
+Job ID: 1393700
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 00:06:17
+CPU Efficiency: 98.18% of 00:06:24 core-walltime
+Job Wall-clock time: 00:06:24
+Memory Utilized: 518.02 MB
+Memory Efficiency: 3.89% of 13.00 GB
