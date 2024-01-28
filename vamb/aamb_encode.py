@@ -859,7 +859,7 @@ class AAE(nn.Module):
                     depths_in = depths_in.cuda()
                     tnfs_in = tnfs_in.cuda()
 
-                mu, _, _, _, y_sample = self(depths_in, tnfs_in)[0:5]
+                mu, _, _, _, _, y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[0:6]
 
                 if self.usecuda:
                     Ys = y_sample.cpu().detach().numpy()
