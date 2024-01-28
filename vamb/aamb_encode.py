@@ -1,6 +1,7 @@
 """Adversarial autoencoders (AAE) for metagenomics binning, this files contains the implementation of the AAE"""
 
 
+from collections.abc import Sequence
 import numpy as np
 from math import log
 import time
@@ -15,12 +16,13 @@ from glob import glob
 import warnings
 import random
 import os
+from numpy.typing import NDArray
 
 from torch.utils.data import DataLoader as _DataLoader
 from argparse import Namespace as _Namespace
 
 from typing import Optional
-from vamb.encode import AutomaticWeightedLoss
+from vamb.encode import AutomaticWeightedLoss, set_batchsize
 import vamb.vambtools
 
 random_seed = 42
@@ -808,7 +810,9 @@ class AAE(nn.Module):
             except:
                 pass
     ########### function that retrieves the clusters from Y latents
-    def get_latents(self, contignames, data_loader, last_epoch=True):
+    def get_latents(
+        self, contignames: Sequence[str], data_loader
+    ) -> tuple[dict[str, set[str]], NDArray[np.float32]]:
         """Retrieve the categorical latent representation (y) and the contiouous latents (l) of the inputs
 
         Inputs:
@@ -819,32 +823,21 @@ class AAE(nn.Module):
 
         Output:
             y_clusters_dict ({clust_id : [contigs]})
-            l_latents array""" #to be clustered with k-medoids
+            l_latents array"""
         self.eval()
 
-        new_data_loader = _DataLoader(
-            dataset=data_loader.dataset,
-            batch_size=data_loader.batch_size,
-            shuffle=False,
-            drop_last=False,
-            num_workers=1,
-            pin_memory=data_loader.pin_memory,
-        )
-
-        depths_array, _, _ = data_loader.dataset.tensors
+        new_data_loader = set_batchsize(data_loader, 256, encode=True)
+        depths_array, _, _, _ = data_loader.dataset.tensors
 
         length = len(depths_array)
         latent = np.empty((length, self.ld), dtype=np.float32)
         index_contigname = 0
         row = 0
-        clust_y_dict = dict()
+        clust_y_dict: dict[str, set[str]] = dict()
         Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         with torch.no_grad():
-
-            for depths_in, tnfs_in, _ in new_data_loader:
+            for depths_in, tnfs_in, _, _ in new_data_loader:
                 nrows, _ = depths_in.shape
-                I = torch.cat((depths_in, tnfs_in), dim=1)
-
                 if self.usecuda:
                     z_prior = torch.cuda.FloatTensor(nrows, self.ld).normal_()
                     z_prior.cuda()
@@ -856,9 +849,7 @@ class AAE(nn.Module):
                     y_prior = y_prior.cuda()
 
                 else:
-                    z_prior = Variable(
-                        Tensor(np.random.normal(0, 1, (nrows, self.ld)))
-                    )
+                    z_prior = Variable(Tensor(self.rng.normal(0, 1, (nrows, self.ld))))
                     ohc = RelaxedOneHotCategorical(
                         0.15, torch.ones([nrows, self.y_len])
                     )
@@ -868,25 +859,18 @@ class AAE(nn.Module):
                     depths_in = depths_in.cuda()
                     tnfs_in = tnfs_in.cuda()
 
-                if last_epoch:
-                    mu, _, _, _, _, y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[
-                        0:6
-                    ]
-                else:
-                    y_sample = self(depths_in, tnfs_in, z_prior, y_prior)[5]
+                mu, _, _, _, y_sample = self(depths_in, tnfs_in)[0:5]
 
                 if self.usecuda:
                     Ys = y_sample.cpu().detach().numpy()
-                    if last_epoch:
-                        mu = mu.cpu().detach().numpy()
-                        latent[row : row + len(mu)] = mu
-                        row += len(mu)
+                    mu = mu.cpu().detach().numpy()
+                    latent[row : row + len(mu)] = mu
+                    row += len(mu)
                 else:
                     Ys = y_sample.detach().numpy()
-                    if last_epoch:
-                        mu = mu.detach().numpy()
-                        latent[row : row + len(mu)] = mu
-                        row += len(mu)
+                    mu = mu.detach().numpy()
+                    latent[row : row + len(mu)] = mu
+                    row += len(mu)
                 del y_sample
 
                 for _y in Ys:
@@ -902,10 +886,7 @@ class AAE(nn.Module):
                     index_contigname += 1
                 del Ys
 
-            if last_epoch:
-                return clust_y_dict, latent
-            else:
-                return clust_y_dict
+            return clust_y_dict, latent
 
     def nt_xent_loss(self, out_1, out_2, temperature=2, eps=1e-6):
         """
