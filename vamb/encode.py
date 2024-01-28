@@ -446,7 +446,7 @@ class VAE(_nn.Module):
             epoch_sseloss = 0.0
             epoch_celoss = 0.0
      
-            for depths_in, tnf_in, weights in data_loader:
+            for depths_in, tnf_in, _, weights in data_loader:
                 depths_in.requires_grad = True
                 tnf_in.requires_grad = True
     

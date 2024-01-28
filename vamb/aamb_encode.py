@@ -331,7 +331,7 @@ class AAE(nn.Module):
 
         #AAMB
         if hparams == _Namespace():
-          for depths_in, tnfs_in, _ in data_loader:
+          for depths_in, tnfs_in, _, _ in data_loader:
                 
                 nrows, _ = depths_in.shape
 
