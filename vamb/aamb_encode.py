@@ -849,7 +849,7 @@ class AAE(nn.Module):
                     y_prior = y_prior.cuda()
 
                 else:
-                    z_prior = Variable(Tensor(self.rng.normal(0, 1, (nrows, self.ld))))
+                    z_prior = Tensor(np.random.normal(0, 1, (nrows, self.ld)))
                     ohc = RelaxedOneHotCategorical(
                         0.15, torch.ones([nrows, self.y_len])
                     )
