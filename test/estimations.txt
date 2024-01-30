@@ -120,3 +120,40 @@ CPU Efficiency: 98.18% of 00:06:24 core-walltime
 Job Wall-clock time: 00:06:24
 Memory Utilized: 518.02 MB
 Memory Efficiency: 3.89% of 13.00 GB
+
+setting nclusters as 16594 estimate k for metahit with pc+Abundance
+Job ID: 1393768
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: OUT_OF_MEMORY (exit code 0)
+Nodes: 1
+Cores per node: 5
+CPU Utilized: 2-16:44:31
+CPU Efficiency: 60.11% of 4-11:41:55 core-walltime
+Job Wall-clock time: 21:32:23
+Memory Utilized: 17.65 GB (estimated maximum)
+Memory Efficiency: 135.78% of 13.00 GB (13.00 GB/node)
+
+setting nclusters as 15906 for metahit pc+abundance
+Job ID: 1394776
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 18:02:38
+CPU Efficiency: 98.98% of 18:13:48 core-walltime
+Job Wall-clock time: 18:13:48
+Memory Utilized: 3.52 GB
+Memory Efficiency: 27.07% of 13.00 GB
+
+setting nclusters as 18324 for metahit tnf+pcabundance
+Job ID: 1394777
+Cluster: cluster_dei
+User/Group: spinaloren/studenti
+State: COMPLETED (exit code 0)
+Cores: 1
+CPU Utilized: 1-01:11:54
+CPU Efficiency: 99.28% of 1-01:22:48 core-walltime
+Job Wall-clock time: 1-01:22:48
+Memory Utilized: 3.91 GB
+Memory Efficiency: 30.10% of 13.00 GB
