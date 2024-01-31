@@ -609,7 +609,7 @@ def run(
     log(f"\nTNF/PC and coabundances generated in {time_generating_input} minutes", logfile, 1)
 
     # Estimate the number of clusters
-    if nlatent_aae_y == None:
+    if 'aae' in model_selection and nlatent_aae_y == None:
         log(f"\nEstimate the number of clusters", logfile, 1)
         begintime = time.time()/60
         #estimator = gmeans(np.concatenate((composition.matrix, abundance), axis=1))
