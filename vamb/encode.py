@@ -588,7 +588,7 @@ class VAE(_nn.Module):
             pin_memory=data_loader.pin_memory,
         )
 
-        depths_array, _, _ = data_loader.dataset.tensors
+        depths_array, _, _, _ = data_loader.dataset.tensors
         length = len(depths_array)
 
         # We make a Numpy array instead of a Torch array because, if we create
@@ -598,7 +598,7 @@ class VAE(_nn.Module):
 
         row = 0
         with _torch.no_grad():
-            for depths, tnf, weights in new_data_loader:
+            for depths, tnf, _, _ in new_data_loader:
                 # Move input to GPU if requested
                 if self.usecuda:
                     depths = depths.cuda()
