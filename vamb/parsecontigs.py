@@ -218,6 +218,13 @@ class Composition:
       projected.extend(pc_mat.ravel())
       pc.clear()
 
+    @staticmethod
+    def normalize(fourmers:_np.ndarray) ->_np.ndarray:
+        s = fourmers.sum(axis=1).reshape(-1, 1) #sum the content of each row, encolumn the results, the number of rows is the same as before
+        s[s == 0] = 1.0
+        fourmers *= 1 / s
+        return fourmers
+
     @classmethod
     def concatenate(cls:type[C], first, second):
         if first == None:
@@ -236,20 +243,22 @@ class Composition:
         return cls(metadata, _vambtools.validate_input_array(concatenated_data))
 
     @classmethod
-    def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100, k=4, use_pc: bool = False) -> C:
+    def from_file(cls: type[C], filehandle: Iterable[bytes], minlength: int = 100, k=4, use_pc: bool = False, use_tnf: bool = True) -> C:
         """Parses a FASTA file open in binary reading mode, returning Composition.
 
         Input:
             filehandle: Filehandle open in binary mode of a FASTA file
             minlength: Ignore any references shorter than N bases [100]
         """
-
+        if not use_tnf and not use_pc:
+            raise ValueError(f"Both use_pc and use_tnf are False, at least one must be True")
         if minlength < 4:
             raise ValueError(f"Minlength must be at least 4, not {minlength}")
 
         raw = _vambtools.PushArray(_np.float32)
         pc = _vambtools.PushArray(_np.float32)
-        projected = _vambtools.PushArray(_np.float32)
+        projected_one = _vambtools.PushArray(_np.float32)
+        projected_two = _vambtools.PushArray(_np.float32)
         lengths = _vambtools.PushArray(_np.int32)
         mask = bytearray()  # we convert to Numpy at end
         contignames: list[str] = list()
@@ -261,14 +270,14 @@ class Composition:
             mask.append(not skip)
             if skip:
                 continue
-            if not use_pc:
+            if use_tnf:
                 raw.extend(entry.kmercounts(k))
                 if len(raw) > 256000:
-                    Composition._convert(raw, projected)
-            else:
+                    Composition._convert(raw, projected_one)
+            if use_pc:
                 pc.extend(entry.pcmercounts(k))
                 if len(pc) > 48000:
-                    Composition._pc_convert_and_project_mat(pc, projected)
+                    Composition._pc_convert_and_project_mat(pc, projected_two)
 
             lengths.append(len(entry))
             contignames.append(entry.header)
@@ -281,21 +290,25 @@ class Composition:
            _np.array(mask, dtype=bool),
             minlength,
         )
+        tnfs_arr = _np.empty(shape=(0,), dtype=_np.float32)
+        pcs_arr = _np.empty(shape=(0,), dtype=_np.float32)
         # Convert rest of contigs
-        if not use_pc:
-            Composition._convert(raw, projected)
-            tnfs_arr = projected.take()
+        if use_tnf:
+            Composition._convert(raw, projected_one)
+            tnfs_arr = projected_one.take()
             # Don't use reshape since it creates a new array object with shared memory
             tnfs_arr.shape = (len(tnfs_arr) // 103, 103)
-            return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
-        else:
-            Composition._pc_convert_and_project_mat(pc, projected)
-            pcs_arr = projected.take()
+            if not use_pc:
+                return cls(metadata, tnfs_arr)  #return a new instance of composition, having metadata as data and tnfs_arr as matrix
+        if use_pc:
+            Composition._pc_convert_and_project_mat(pc, projected_two)
+            pcs_arr = projected_two.take()
             pcs_arr.shape = (len(lengths_arr), len(pcs_arr) // len(lengths_arr))
-            return cls(metadata, pcs_arr)  #return a new instance of composition, having metadata as data and pcs_arr as matrix
-
+            if not use_tnf:
+                return cls(metadata, pcs_arr)  #return a new instance of composition, having metadata as data and pcs_arr as matrix
+        return cls(metadata, Composition.normalize(_np.concatenate((tnfs_arr, pcs_arr), axis = 1)))
     @classmethod
-    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, index_list=None, store_dir="./", backup_iteration=18, augmode=[-1,-1], use_pc = False, already = False):
+    def read_contigs_augmentation(cls: type[C], filehandle, minlength=100, k=4, index_list=None, store_dir="./", backup_iteration=18, augmode=[-1,-1], use_pc = False, use_tnf = True, already = False):
         """Parses a FASTA file open in binary reading mode.
 
         Input:
@@ -314,13 +327,14 @@ class Composition:
         Stores:
             augmentation data (gaussian_noise, transition, transversion, mutation)
         """
-
+        if not use_tnf and not use_pc:
+            raise ValueError(f"Both use_pc and use_tnf are False, at least one must be True")
+        
         if minlength < 4:
             raise ValueError('Minlength must be at least 4, not {}'.format(minlength))
 
         norm = _vambtools.PushArray(_np.float32)
         pc = _vambtools.PushArray(_np.float32)
-        projected = _vambtools.PushArray(_np.float32)
         gaussian = _vambtools.PushArray(_np.float32)
         trans = _vambtools.PushArray(_np.float32)
         traver = _vambtools.PushArray(_np.float32)
@@ -399,26 +413,31 @@ class Composition:
                         continue
                     t = _np.empty(0, dtype=_np.int32) 
                     q = _np.empty(0, dtype=_np.int32) 
-                    if not use_pc:
+                    if use_tnf:
                         t = entry.kmercounts(k)
-                    else:
+                    if use_pc:
                         q = entry.pcmercounts(k)
                     # t_norm = t / _np.sum(t)
                     # _np.add(t_norm, - 1/(2*4**k), out=t_norm)
                     # print(t_norm)
                     #print(t)
                     if i == 0 and i2 == 0:
-                        if not use_pc:
+                        if use_tnf:
                             norm.extend(t)
-                        else:
+                        if use_pc:
                             pc.extend(q)
 
                     for j in range(gaussian_count[i]):
-                        if not use_pc:
+                        if use_tnf:
                             t_gaussian = mimics.add_noise(t)
-                            gaussian.extend(t_gaussian)
-                        else:
-                            gaussian.extend(mimics.add_noise(q))
+                            if not use_pc:
+                                gaussian.extend(t_gaussian)
+                        if use_pc:
+                            q_gaussian = mimics.add_noise(q)
+                            if not use_tnf:
+                                gaussian.extend(q_gaussian)
+                            else:
+                                gaussian.extend(_np.concatenate((t_gaussian, q_gaussian)))
                         # print('gaussian',_np.sum(t_gaussian-t_norm))
 
                     # mutations = mimics.transition(entry.sequence, 1 - 0.021, trans_count[i])
@@ -428,12 +447,16 @@ class Composition:
                         '''
                         As the function _kmercounts changes the input array at storage, we should reset counts_kmer's storage when using it.
                         '''
-                        if not use_pc:
+                        if use_tnf:
                             counts_kmer = _np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        else:
-                            counts_kmer = _np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
-                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        if use_pc:
+                            counts_pmer = _np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_pmer)
+                            if use_tnf:
+                                counts_kmer = _np.concatenate((counts_kmer, counts_pmer))
+                            else:
+                                counts_kmer = counts_pmer
                         # t_trans = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_trans, - 1/(2*4**k), out=t_trans)
                         '''
@@ -446,12 +469,16 @@ class Composition:
                     if traver_count[i] != 0:
                         mutations = mimics.transversion(entry.sequence, 1 - 0.003, traver_count[i])
                     for j in range(traver_count[i]):
-                        if not use_pc:
+                        if use_tnf:
                             counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        else:
-                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
-                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        if use_pc:
+                            counts_pmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_pmer)
+                            if use_tnf:
+                                counts_kmer = _np.concatenate((counts_kmer, counts_pmer))
+                            else:
+                                counts_kmer = counts_pmer
                         # t_traver = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_traver, - 1/(2*4**k), out=t_traver)
                         traver.extend(counts_kmer.copy())
@@ -461,12 +488,16 @@ class Composition:
                     if mutated_count[i] != 0:
                         mutations = mimics.transition_transversion(entry.sequence, 1 - 0.065, 1 - 0.003, mutated_count[i])
                     for j in range(mutated_count[i]):
-                        if not use_pc:
+                        if use_tnf:
                             counts_kmer =_np.zeros(1 << (2*k), dtype=_np.int32)
                             v._kmercounts(bytearray(mutations[j]), k, counts_kmer)
-                        else:
-                            counts_kmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
-                            v._pcmercounts(bytearray(mutations[j]), k, counts_kmer)
+                        if use_pc:
+                            counts_pmer =_np.zeros((3, 1 << k), dtype=_np.int32).reshape(-1)
+                            v._pcmercounts(bytearray(mutations[j]), k, counts_pmer)
+                            if use_tnf:
+                                counts_kmer = _np.concatenate((counts_kmer, counts_pmer))
+                            else:
+                                counts_kmer = counts_pmer
                         # t_mutated = counts_kmer / _np.sum(counts_kmer)
                         # _np.add(t_mutated, - 1/(2*4**k), out=t_mutated)
                         mutated.extend(counts_kmer.copy())
@@ -479,33 +510,41 @@ class Composition:
                 # Don't use reshape since it creates a new array object with shared memory
                 gaussian_arr = gaussian.take()
                 if gaussian_count[i] != 0:
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         gaussian_arr.shape = (-1, gaussian_count[i], 4**k)
-                    else:
+                    elif use_pc and not use_tnf:
                         gaussian_arr.shape = (-1, gaussian_count[i], 3 * 2**k)
+                    elif use_tnf and use_pc:
+                        gaussian_arr.shape  = (-1, gaussian_count[i], 4**k + 3 * 2**k)
                 trans_arr = trans.take()
                 if trans_count[i] != 0:
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         trans_arr.shape = (-1, trans_count[i], 4**k)
-                    else:
+                    elif use_pc and not use_tnf:
                         trans_arr.shape = (-1, trans_count[i], 3 * 2**k)
+                    elif use_tnf and use_pc:
+                        trans_arr.shape  = (-1, trans_count[i], 4**k + 3 * 2**k)
                 traver_arr = traver.take()
                 if traver_count[i] != 0:
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         traver_arr.shape = (-1, traver_count[i], 4**k)
-                    else:
+                    elif use_pc and not use_tnf:
                         traver_arr.shape = (-1, traver_count[i], 3 * 2**k)
+                    elif use_tnf and use_pc:
+                        traver_arr.shape  = (-1, traver_count[i], 4**k + 3 * 2**k)
                 mutated_arr = mutated.take()
                 if mutated_count[i] != 0:
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         mutated_arr.shape = (-1, mutated_count[i], 4**k)
-                    else:
+                    elif use_pc and not use_tnf:
                         mutated_arr.shape = (-1, mutated_count[i], 3 * 2**k)
+                    elif use_tnf and use_pc:
+                        mutated_arr.shape  = (-1, mutated_count[i], 4**k + 3 * 2**k)
                 # AllAugmentation','GaussianNoise','Transition','Transversion','Mutation'
                 for j2 in range(gaussian_count[i]):
                     gaussian_save = gaussian_arr[:,j2,:]
                     filepath = f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_GaussianNoise_{j2}.npz"
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         gaussian_save.shape = (-1, 4**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -513,7 +552,7 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._convert_and_project_mat(gaussian_save, _KERNEL_PROJ, k))
-                    else:
+                    elif use_pc and not use_tnf:
                         gaussian_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -521,11 +560,22 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._pc_project(gaussian_save))
+                    elif use_tnf and use_pc:
+                        gaussian_save.shape = (-1, 4**k + 3* 2**k)
+                        cols_first = 4**k
+                        cols_second = 3 * 2**k
+                        new_data = Composition.normalize(_np.concatenate((Composition._convert_and_project_mat(gaussian_save[:, :cols_first], _KERNEL_PROJ, k), Composition._pc_project(gaussian_save[:, cols_first:(cols_first + cols_second)])), axis = 1))
+                        if already:
+                            existing_data = _np.load(filepath)['arr_0']
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
+                        else:
+                            _np.savez(filepath, new_data)
+
                     index += 1
                 for j2 in range(trans_count[i]):
                     trans_save = trans_arr[:,j2,:]
                     filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Transition_{j2}.npz"
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         trans_save.shape = (-1, 4**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -533,7 +583,7 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._convert_and_project_mat(trans_save, _KERNEL_PROJ, k))
-                    else:
+                    elif use_pc and not use_tnf:
                         trans_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -541,12 +591,22 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._pc_project(trans_save))
+                    elif use_tnf and use_pc:
+                        trans_save.shape = (-1, 4**k + 3* 2**k)
+                        cols_first = 4**k
+                        cols_second = 3 * 2**k
+                        new_data = Composition.normalize(_np.concatenate((Composition._convert_and_project_mat(trans_save[:, :cols_first], _KERNEL_PROJ, k), Composition._pc_project(trans_save[:, cols_first:(cols_first + cols_second)])), axis = 1))
+                        if already:
+                            existing_data = _np.load(filepath)['arr_0']
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
+                        else:
+                            _np.savez(filepath, new_data)
                     index += 1
 
                 for j2 in range(traver_count[i]):
                     traver_save = traver_arr[:,j2,:]
                     filepath = f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Transversion_{j2}.npz"
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         traver_save.shape = (-1, 4**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -554,7 +614,7 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._convert_and_project_mat(traver_save, _KERNEL_PROJ, k))
-                    else:
+                    elif use_pc and not use_tnf:
                         traver_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -562,12 +622,22 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._pc_project(traver_save))
+                    elif use_tnf and use_pc:
+                        traver_save.shape = (-1, 4**k + 3* 2**k)
+                        cols_first = 4**k
+                        cols_second = 3 * 2**k
+                        new_data = Composition.normalize(_np.concatenate((Composition._convert_and_project_mat(traver_save[:, :cols_first], _KERNEL_PROJ, k), Composition._pc_project(traver_save[:, cols_first:(cols_first + cols_second)])), axis = 1))
+                        if already:
+                            existing_data = _np.load(filepath)['arr_0']
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
+                        else:
+                            _np.savez(filepath, new_data)
                     index += 1
 
                 for j2 in range(mutated_count[i]):
                     mutated_save = mutated_arr[:,j2,:]
                     filepath=f"{store_dir+_os.sep}pool{i}_k{k}_index{index_list[i][index]}_Mutation_{j2}.npz"
-                    if not use_pc:
+                    if use_tnf and not use_pc:
                         mutated_save.shape = (-1, 4**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -575,7 +645,7 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._convert_and_project_mat(mutated_save, _KERNEL_PROJ, k))
-                    else:
+                    elif use_pc and not use_tnf:
                         mutated_save.shape = (-1, 3* 2**k)
                         if already:
                             existing_data = _np.load(filepath)['arr_0']
@@ -583,6 +653,16 @@ class Composition:
                             _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
                         else:
                             _np.savez(filepath, Composition._pc_project(mutated_save))
+                    elif use_tnf and use_pc:
+                        mutated_save.shape = (-1, 4**k + 3* 2**k)
+                        cols_first = 4**k
+                        cols_second = 3 * 2**k
+                        new_data = Composition.normalize(_np.concatenate((Composition._convert_and_project_mat(mutated_save[:, :cols_first], _KERNEL_PROJ, k), Composition._pc_project(mutated_save[:, cols_first:(cols_first + cols_second)])), axis = 1))
+                        if already:
+                            existing_data = _np.load(filepath)['arr_0']
+                            _np.savez(filepath, _np.concatenate((existing_data, new_data), axis=0))
+                        else:
+                            _np.savez(filepath, new_data)
                     index += 1
 
                 gaussian.clear()
@@ -593,16 +673,23 @@ class Composition:
                 print(time.time(), backup_iteration, backup_iteration_2, backup_iteration_3)
 
         lengths_arr = lengths.take()
-        if not use_pc:
+        if use_tnf and not use_pc:
             #Composition._convert(norm, projected)
             norm_arr = norm.take()  #projected.take
             norm_arr.shape = (-1, 4**k)
             norm_arr = Composition._convert_and_project_mat(norm_arr, _KERNEL_PROJ, k)
         
-        else:
+        elif not use_tnf and use_pc:
             norm_arr = pc.take()   #to take pcmer instead of tnfs
             norm_arr.shape = (-1, 3 * 2**k)
             norm_arr = Composition._pc_project(norm_arr)
+        
+        elif use_tnf and use_pc:
+            norm_arr = _np.concatenate((norm.take(), pc.take()), axis = 1)
+            cols_first = 4**k
+            cols_second = 3 * 2**k
+            norm_arr.shape = (-1, 4**k + 3 * 2**k)
+            norm_arr = Composition.normalize(_np.concatenate((Composition._convert_and_project_mat(norm_arr[:, :cols_first], _KERNEL_PROJ, k), Composition._pc_project(norm_arr[:, cols_first:(cols_first + cols_second)])), axis = 1))
 
         metadata = CompositionMetaData(
            _np.array(contignames, dtype=object),

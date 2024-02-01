@@ -64,14 +64,15 @@ def calc_tnf(
     augmode = [-1,-1],
     contrastive=True,
     k=4,
-    use_pc=False
+    use_pc=False,
+    use_tnf=True
 ) -> vamb.parsecontigs.Composition:
     begintime = time.time()/60
     log("\nLoading TNF/PC", logfile, 0)
     log(f"Minimum sequence length: {mincontiglength}", logfile, 1)
     if use_pc:
         log(f"Using pcmers", logfile, 1)
-    else:
+    if use_tnf:
         log(f"Using kmers", logfile, 1)
     if npzpath is not None:
         log(f"Loading composition from npz {npzpath}", logfile, 1)
@@ -91,7 +92,7 @@ def calc_tnf(
             if not contrastive:
                 with vamb.vambtools.Reader(fastapath[0]) as file:
                     composition = vamb.parsecontigs.Composition.from_file(
-                        file, minlength=mincontiglength, use_pc = use_pc
+                        file, minlength=mincontiglength, use_pc = use_pc, use_tnf=use_tnf,
                     )
                     file.close()
             else:
@@ -99,7 +100,7 @@ def calc_tnf(
                 log('Generating {} augmentation data'.format(backup_iteration), logfile, 1)
                 with vamb.vambtools.Reader(fastapath[0]) as file:
                     composition = vamb.parsecontigs.Composition.read_contigs_augmentation(
-                        file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc)
+                        file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, use_tnf=use_tnf)
                     file.close()
             composition.save(os.path.join(outdir, "composition.npz"))
         else:        #multiple files in input (multiple datasets)
@@ -112,7 +113,7 @@ def calc_tnf(
                             b = False
                             composition = None
                         composition = vamb.parsecontigs.Composition.concatenate(composition, vamb.parsecontigs.Composition.from_file(
-                            file, minlength=mincontiglength, use_pc=use_pc
+                            file, minlength=mincontiglength, use_pc=use_pc, use_tnf=use_tnf
                         ))
                         file.close()    
                 if contrastive:
@@ -121,7 +122,7 @@ def calc_tnf(
                     with vamb.vambtools.Reader(path) as file:
                         #Generate the composition for this path and update the overall augmentation files
                         newcomp = vamb.parsecontigs.Composition.read_contigs_augmentation(
-                            file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, already = not b)
+                            file, minlength=mincontiglength, k=k, index_list = index_list, store_dir=augmentation_store_dir, backup_iteration=backup_iteration, augmode=augmode, use_pc = use_pc, use_tnf=use_tnf, already = not b)
                         if b:
                             b = False
                             composition = None
@@ -549,6 +550,7 @@ def run(
     minfasta: Optional[int],
     model_selection: str,
     use_pc: bool,
+    use_tnf: bool,
     logfile: IO[str]
 ):
 
@@ -571,7 +573,8 @@ def run(
                            augmentation_store_dir=augmentationpath,
                            contrastive=contrastive,
                            k=k,
-                           use_pc = use_pc)
+                           use_pc = use_pc
+                           use_tnf = use_tnf)
     # Parse BAMs, save as npz
     refhash = None if norefcheck else vamb.vambtools._hash_refnames(composition.metadata.identifiers)
     abundance = calc_rpkm(
@@ -851,7 +854,8 @@ def main():
     tnfos.add_argument("--fasta", metavar="", nargs='+', help="path to fasta file or paths to fasta files")
     tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
-    tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers instead of tnf [False]')
+    tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers for composition [False]')
+    tnfos.add_argument("--use_tnf", action='store_true', default=True, help='Wether to use tnf for composition [True]')
 
     # Contrastive learning arguments
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
@@ -1140,7 +1144,13 @@ def main():
     minsize: int = args.minsize
     maxclusters: Optional[int] = args.maxclusters
     separator: Optional[str] = args.separator
-    global_separator = separator
+
+    use_tnf = False
+    if args.use_tnf:
+        use_tnf = True
+    else:
+        if not args.use_pc:
+            use_tnf = True
 
     contrastive: bool = (args.contrastive_vae) ^ (args.contrastive_aae)
     
@@ -1416,6 +1426,7 @@ def main():
             minfasta=minfasta,
             model_selection=args.model,
             use_pc = args.use_pc,
+            use_tnf = use_tnf,
             logfile=logfile,
         )
 
