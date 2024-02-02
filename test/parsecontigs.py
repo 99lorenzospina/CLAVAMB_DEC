@@ -8,13 +8,14 @@ import time
 parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parentdir)
 import vamb
+'''
 fasta_path = os.path.join(parentdir, 'test', 'data', 'fasta.fna')
 npzpath = os.path.join(parentdir, 'test', 'data', 'tnf.npz')
 b = np.load(npzpath)
 print(b.files)
 #print(type(b['identifiers'][0]))
 print((b['arr_0']))
-'''
+
 # Test it fails with non binary opened
 with open(fasta_path) as file:
     try:
@@ -146,27 +147,28 @@ assert np.array_equal(contignames, ['Sequence1_100nt_no_special',
  'Sequence6 150 nt, same as seq4 but mixed case'])
 
 assert np.all(contiglengths == np.array([len(i) for i in contigs if len(i) >= 100]))
-
+'''
 #bigpath = os.path.join(parentdir, 'test', 'data', 'bigfasta.fna.gz')
 bigpath =os.path.join(parentdir, 'test', 'data', 'contigs.fna.gz')
 begintime= time.time()
 with vamb.vambtools.Reader(bigpath) as f:
-    tnf= vamb.parsecontigs_parallel.Composition.from_file(f, use_pc= False).matrix
+    tnf= vamb.parsecontigs.Composition.from_file(f, use_tnf = True, use_pc= True).matrix
     f.close()
 elapsed = round(time.time() - begintime, 2)
-print("Time for parallel:", elapsed)
+print("Time required:", elapsed)
+absolute_values = np.abs(tnf)
+print(np.where((absolute_values < 0) | (absolute_values > 1)))
 begintime= time.time()
 with vamb.vambtools.Reader(bigpath) as f:
-    tnf2= vamb.parsecontigs.Composition.from_file(f, use_pc= False).matrix
+    tnf= vamb.parsecontigs.Composition.from_file(f, use_tnf = True, use_pc= False).matrix
     f.close()
 elapsed = round(time.time() - begintime, 2)
-print("Time for sequential:", elapsed)
-print(np.where(tnf!=tnf2))
-num_threads = threading.active_count()
-print(f"Numero totale di threads attivi: {num_threads}")
+print("Time required:", elapsed)
+absolute_values = np.abs(tnf)
+print(np.where((absolute_values < 0) | (absolute_values > 1)))
 #target_tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
-
+'''
 paths = [fasta_path, bigpath]
 backup_iteration=9
 index_list_one = list(range(backup_iteration))

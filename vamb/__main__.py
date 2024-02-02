@@ -573,7 +573,7 @@ def run(
                            augmentation_store_dir=augmentationpath,
                            contrastive=contrastive,
                            k=k,
-                           use_pc = use_pc
+                           use_pc = use_pc,
                            use_tnf = use_tnf)
     # Parse BAMs, save as npz
     refhash = None if norefcheck else vamb.vambtools._hash_refnames(composition.metadata.identifiers)
