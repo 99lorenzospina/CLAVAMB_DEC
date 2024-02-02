@@ -533,9 +533,11 @@ def write_bins(
     except:
         raise
     
+    '''
     import pickle
     with open(_os.path.join(directory, 'byteslen_by_id.pickle'), 'wb') as file:
         pickle.dump(byteslen_by_id, file)
+    '''
 
     # Now actually print all the contigs to files
     for binname, contigs in bins.items():
