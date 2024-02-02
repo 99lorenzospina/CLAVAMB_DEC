@@ -157,7 +157,10 @@ with vamb.vambtools.Reader(bigpath) as f:
 elapsed = round(time.time() - begintime, 2)
 print("Time required:", elapsed)
 absolute_values = np.abs(tnf)
-print(np.where((absolute_values < 0) | (absolute_values > 1)))
+positions = np.where((absolute_values < 0) | (absolute_values > 1))
+print("Valori e posizioni degli elementi che non sono compresi tra 0 e 1:")
+for pos in zip(*positions):
+    print(f"Posizione: {pos}, Valore: {tnf[pos]}")
 begintime= time.time()
 with vamb.vambtools.Reader(bigpath) as f:
     tnf= vamb.parsecontigs.Composition.from_file(f, use_tnf = True, use_pc= False).matrix
@@ -165,7 +168,10 @@ with vamb.vambtools.Reader(bigpath) as f:
 elapsed = round(time.time() - begintime, 2)
 print("Time required:", elapsed)
 absolute_values = np.abs(tnf)
-print(np.where((absolute_values < 0) | (absolute_values > 1)))
+positions = np.where((absolute_values < 0) | (absolute_values > 1))
+print("Valori e posizioni degli elementi che non sono compresi tra 0 e 1:")
+for pos in zip(*positions):
+    print(f"Posizione: {pos}, Valore: {tnf[pos]}")
 #target_tnf = vamb.vambtools.read_npz(os.path.join(parentdir, 'test', 'data', 'target_tnf.npz'))
 #assert np.all(abs(tnf - target_tnf) < 1e-8)
 '''

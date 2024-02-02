@@ -220,9 +220,10 @@ class Composition:
 
     @staticmethod
     def normalize(fourmers:_np.ndarray) ->_np.ndarray:
-        s = fourmers.sum(axis=1).reshape(-1, 1) #sum the content of each row, encolumn the results, the number of rows is the same as before
-        s[s == 0] = 1.0
-        fourmers *= 1 / s
+        fourmers.reshape(-1, 151)
+        abs_sum = _np.abs(fourmers).sum(axis=1).reshape(-1, 1)
+        abs_sum[abs_sum == 0] = 1.0
+        fourmers *= 1 / abs_sum
         return fourmers
 
     @classmethod
