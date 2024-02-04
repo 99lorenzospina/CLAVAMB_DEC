@@ -56,7 +56,9 @@ if __name__ == "__main__":
 
     bins_set = set()
     for sample in os.listdir(opt.b):
+        print("sample", sample)
         for bin_ in os.listdir(os.path.join(opt.b, sample)):
+            print("bin_", bin_)
             if ".fna" in bin_:
                 bins_set.add(bin_)
     print("bins", bins_set)
