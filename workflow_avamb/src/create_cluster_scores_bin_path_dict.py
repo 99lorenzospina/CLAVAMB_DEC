@@ -34,8 +34,6 @@ def get_cluster_score_bin_path(
                 bin_path[cluster + ".fna"] = os.path.join(
                     path_bins, sample, cluster + ".fna"
                 )
-        print("cluster_score", cluster_score)
-        print("bin_path", bin_path)
     return cluster_score, bin_path
 
 
