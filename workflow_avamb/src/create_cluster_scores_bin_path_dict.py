@@ -24,7 +24,7 @@ def get_cluster_score_bin_path(
             dtype=str,
             ndmin=2,
         )
-
+        print("c_com_con", c_com_con)
         for row in c_com_con:
             cluster, com, con = row
             cluster = cast(str, cluster)
@@ -35,6 +35,8 @@ def get_cluster_score_bin_path(
                 bin_path[cluster + ".fna"] = os.path.join(
                     path_bins, sample, cluster + ".fna"
                 )
+        print("cluster_score", cluster_score)
+        print("bin_path", bin_path)
     return cluster_score, bin_path
 
 
