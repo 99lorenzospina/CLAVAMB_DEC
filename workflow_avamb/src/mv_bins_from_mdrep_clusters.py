@@ -60,12 +60,12 @@ def get_cluster_sample(
     cluster_contigs: dict[str, set[str]], bin_separator: Optional[str]
 ) -> dict[str, str]:
     cluster_sample: dict[str, str] = dict()
+    print(cluster_sample)
     for cluster_ in cluster_contigs.keys():
         contigs = cluster_contigs[cluster_]
         contig_i = next(iter(contigs))
         sample = contig_i.split(bin_separator)[0]
         cluster_sample[cluster_] = sample
-    print(cluster_sample)
     return cluster_sample
 
 
