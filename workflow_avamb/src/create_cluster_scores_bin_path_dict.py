@@ -27,6 +27,9 @@ def get_cluster_score_bin_path(
         print("c_com_con", c_com_con)
         for row in c_com_con:
             cluster, com, con = row
+            print("cluster", cluster)
+            print("com", com)
+            print("con", con)
             cluster = cast(str, cluster)
             com, con = float(com), float(con)
             bin_name = cluster + ".fna"
