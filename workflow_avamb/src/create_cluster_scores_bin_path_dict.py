@@ -29,9 +29,7 @@ def get_cluster_score_bin_path(
             cluster = cast(str, cluster)
             com, con = float(com), float(con)
             bin_name = cluster + ".fna"
-            print("bin_name", bin_name)
             if bin_name in bins:
-                print("match")
                 cluster_score[cluster] = (com, con)
                 bin_path[cluster + ".fna"] = os.path.join(
                     path_bins, sample, cluster + ".fna"
@@ -56,12 +54,9 @@ if __name__ == "__main__":
 
     bins_set = set()
     for sample in os.listdir(opt.b):
-        print("sample", sample)
         for bin_ in os.listdir(os.path.join(opt.b, sample)):
-            print("bin_", bin_)
             if ".fna" in bin_:
                 bins_set.add(bin_)
-    print("bins", bins_set)
     cluster_score, bin_path = get_cluster_score_bin_path(opt.s, opt.b, bins_set)
     with open(opt.cs_d, "w") as f:
         json.dump(cluster_score, f)
