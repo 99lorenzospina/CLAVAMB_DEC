@@ -19,7 +19,6 @@ def main(
     path_ripped: str,
     path_clusters_not_ripped: str,
 ) -> dict[str, str]:
-
     cluster_contigs_original = cluster_contigs.copy()
 
     contig_length = get_contig_length(contig_names, contig_lengths)
@@ -47,9 +46,12 @@ def main(
         graph_clusters, cluster_contigs, bin_path, path_ripped
     )
 
-
-    clusters_changed_but_not_intersecting_contigs_total = clusters_changed_but_not_intersecting_contigs.copy()
-    clusters_changed_but_not_intersecting_contigs_total.update(clusters_changed_but_not_intersecting_contigs_2)
+    clusters_changed_but_not_intersecting_contigs_total = (
+        clusters_changed_but_not_intersecting_contigs.copy()
+    )
+    clusters_changed_but_not_intersecting_contigs_total.update(
+        clusters_changed_but_not_intersecting_contigs_2
+    )
 
     (
         bin_path,
@@ -68,6 +70,7 @@ def main(
             del cluster_contigs_not_ripped[cluster]
 
     with open(path_clusters_not_ripped, "w") as file:
+        print(vamb.vambtools.CLUSTERS_HEADER, file=file)
         for cluster, contigs_nr in cluster_contigs_not_ripped.items():
             contigs_o = cluster_contigs_original[cluster]
             if contigs_o != contigs_nr:
@@ -84,17 +87,11 @@ def get_contig_length(names: Sequence[str], lengths: Sequence[int]) -> dict[str,
     return dict(zip(names, lengths))
 
 
-"""
-In breve, la funzione itera attraverso i cluster e i relativi contig,
-accumulando la lunghezza di ciascun contig nel totale del cluster.
-Il risultato è un OrderedDict che mappa i nomi dei cluster alle loro
-lunghezze totali, ordinato per chiave.
-"""
 def get_cluster_length(
     cluster_contigs: dict[str, set[str]], contig_length: dict[str, int]
 ) -> OrderedDict[str, int]:
     cluster_length: OrderedDict[str, int] = OrderedDict()
-    for (cluster_name, contigs) in cluster_contigs.items():
+    for cluster_name, contigs in cluster_contigs.items():
         cluster_length[cluster_name] = 0
         for contig in contigs:
             cluster_length[cluster_name] += contig_length[contig]
@@ -107,7 +104,8 @@ def get_graph_clusters(
     cluster_length: OrderedDict[str, int],
 ):
     """Generate a graph where each cluster is a node and each edge connecting 2 nodes is
-    created if clusters share some contigs, edges are weighted by the intersection length"""
+    created if clusters share some contigs, edges are weighted by the intersection length
+    """
     graph_clusters = nx.Graph()
     for i, cluster_i in enumerate(cluster_contigs.keys()):
         for j, cluster_j in enumerate(cluster_contigs.keys()):
@@ -246,7 +244,8 @@ def make_all_components_pair(
 ):
     """Iterate over all graph components that contain more than 2 nodes/clusters and break them down to
     2 nodes/clusters components according the following criteria:
-        - Remove the weaker edge by removing the intersecting contigs from the larger cluster"""
+        - Remove the weaker edge by removing the intersecting contigs from the larger cluster
+    """
 
     components: list[set[str]] = list()
     for component in nx.connected_components(graph_clusters):
@@ -262,6 +261,9 @@ def make_all_components_pair(
                         cl_i_cl_j_edge_weight: float = graph_clusters.get_edge_data(
                             cl_i, cl_j
                         )["weight"]
+                        # if the weight as key in the dict and is mapping to different clusters (nodes)
+                        # then add a insignificant value to the weight so we can add the weight with
+                        # different clusters (nodes)
                         if (
                             cl_i_cl_j_edge_weight in weight_edges.keys()
                             and weight_edges[cl_i_cl_j_edge_weight] != {cl_i, cl_j}
@@ -269,13 +271,21 @@ def make_all_components_pair(
                             cl_i_cl_j_edge_weight += 1 * 10**-30
                         weight_edges[cl_i_cl_j_edge_weight] = {cl_i, cl_j}
 
-            dsc_sorted_weights: list[float] = [min(weight_edges.keys())]
+            dsc_sorted_weights: list[float] = sorted(list(weight_edges.keys()))
+
             i = 0
             component_len = len(component)
+
+            print(
+                dsc_sorted_weights,
+                len(dsc_sorted_weights),
+                len(component),
+                weight_edges.keys(),
+            )
             while component_len > 2:
                 weight_i = dsc_sorted_weights[i]
                 cl_i, cl_j = weight_edges[weight_i]
-
+                print(weight_i, cl_i, cl_j)
                 cluster_updated = move_intersection_to_smaller_cluster(
                     graph_clusters,
                     cl_i,
@@ -316,17 +326,6 @@ def make_all_components_pair(
     )
 
 
-"""
-La funzione itera attraverso i componenti connessi
-nel grafo e crea coppie di bin (cl_i, cl_j) per
-ciascun componente. I contig che sono in entrambi i
-cluster vengono identificati e rimossi dai rispettivi
-bin. I bin "ripped" vengono quindi scritti nella
-directory specificata (path_ripped), e i nomi dei
-cluster associati ai bin "ripped" vengono aggiunti a
-un insieme ripped_clusters_set. Infine, se la directory
-path_ripped risulta vuota, viene rimossa.
-"""
 def create_ripped_clusters_and_write_ripped_bins(
     graph_clusters: nx.Graph,
     cluster_contigs: dict[str, set[str]],
@@ -380,11 +379,6 @@ def create_ripped_clusters_and_write_ripped_bins(
     return ripped_clusters_set
 
 
-"""
-La funzione legge il file fasta del bin originale, estrae i contig che
-non sono presenti nell'insieme contigs_cluster_ripped e scrive questi
-contig nel nuovo bin "ripped" 
-"""
 def write_ripped_bin(
     contigs_cluster_ripped, bin_i_path: str, bin_i_ripped_path: str
 ) -> None:
@@ -457,10 +451,10 @@ if __name__ == "__main__":
 
     clusters_path = (
         opt.ci
-    )  #  os.path.join(path_run,'aae_l_y_vamb_manual_drep_85_10_clusters.tsv')
+    )  # os.path.join(path_run,'aae_l_y_vamb_manual_drep_85_10_clusters.tsv')
     clusters_not_ripped_path = (
         opt.co
-    )  #   os.path.join(path_run,'aae_l_y_vamb_manual_drep_85_10_not_ripped_clusters.tsv')
+    )  # os.path.join(path_run,'aae_l_y_vamb_manual_drep_85_10_not_ripped_clusters.tsv')
 
     with open(clusters_path) as file:
         cluster_contigs = vamb.vambtools.read_clusters(file)

@@ -1,9 +1,4 @@
 #!/usr/bin/bash
-
-#L'obiettivo principale dello script sembra essere quello di
-#creare un elenco di cluster e contigs dai file ".fna" presenti
-#nelle sottodirectory di una directory specificata.
-
 while getopts "d:o:" opt; do
   case $opt in
     d) drep_dir=$OPTARG    ;;
@@ -12,6 +7,7 @@ while getopts "d:o:" opt; do
        exit 1
   esac
 done
+output_file=$(pwd)/${clusters_file}/avamb/avamb_manual_drep_disjoint_clusters.tsv
 echo 'creating z y v clusters from the final set of bins'
 for s in $(ls $drep_dir)
 do
@@ -19,39 +15,23 @@ s="$drep_dir"/"$s"/
 if [ -d "$s" ]
 then
 cd $s
-#for bin in $(ls dereplicated_genomes 2> /dev/null)
 for bin in $(ls . 2> /dev/null)
 
-do  
+do
 if [[ $bin == **".fna" ]]
 then
-#echo $bin
 
 cluster_name=$(echo $bin | sed 's=.fna==g' | sed 's=.fa==g')
-#echo $cluster_name
-#bin="$s"dereplicated_genomes/"$bin"
-#bin="$s""$bin"
-#echo $bin
-#grep  '>' $bin | sed 's=>==g'
-for contig in $(grep '>' $bin | sed 's=>==g') 
+
+echo -e   "clustername\tcontigname"  >> $output_file
+for contig in $(grep '>' $bin | sed 's=>==g')
 do
-echo -e   "$cluster_name""\t""$contig"  >> $clusters_file
+echo -e   "$cluster_name""\t""$contig"  >> $output_file
 done
 
 
 fi
 done
-#for bin in $(ls ripped_bins_selected 2> /dev/null)
-#do  
-#if [[ $bin == **".fna" ]]
-#then
-#bin="$s"ripped_bins_selected/"$bin"
-#
-#for contig in $(grep '>' $bin | sed 's=>==g') 
-#do
-#echo -e   "$cluster_name""$\t""$contig"  >> $clusters_file
-#done
-#fi
-#done 
+
 fi
-done 
+done

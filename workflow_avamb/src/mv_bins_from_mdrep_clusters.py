@@ -17,7 +17,6 @@ def main(
     min_comp: float = 0.9,
     max_cont: float = 0.05,
 ):
-
     cluster_sample = get_cluster_sample(cluster_contigs, bin_separator)
     nc_cluster_scores = get_nc_cluster_scores(
         cluster_scores, cluster_sample, min_comp, max_cont
@@ -30,10 +29,6 @@ def main(
     write_final_nc_clusters(nc_cluster_scores, cluster_contigs, path_nc_clusters)
 
 
-"""
-Dizionario di clusters con i rispettivi score di
-completezza e contaminazione
-"""
 def get_nc_cluster_scores(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
@@ -53,30 +48,19 @@ def get_nc_cluster_scores(
     return nc_cluster_scores
 
 
-"""
-Ritorna il sample di appartenenza del cluster
-"""
 def get_cluster_sample(
     cluster_contigs: dict[str, set[str]], bin_separator: Optional[str]
 ) -> dict[str, str]:
-    print("cluster_contigs", cluster_contigs)
     cluster_sample: dict[str, str] = dict()
     for cluster_ in cluster_contigs.keys():
         contigs = cluster_contigs[cluster_]
         contig_i = next(iter(contigs))
-        if bin_separator != None:
-            sample = contig_i.split(bin_separator)[0]
-        else:
-            sample = 'SM' #for metahit
+        sample = contig_i.split(bin_separator)[0]
         cluster_sample[cluster_] = sample
-    print("cluster_sample", cluster_sample)
+
     return cluster_sample
 
 
-"""
-Crea una cartella per ogni sample ottenuto esaminando
-i clusters
-"""
 def create_nc_sample_folders(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
@@ -84,7 +68,6 @@ def create_nc_sample_folders(
 ):
     nc_samples: set[str] = set()
     for cluster in cluster_scores.keys():
-
         sample = cluster_sample[cluster]
         nc_samples.add(sample)
 
@@ -95,16 +78,12 @@ def create_nc_sample_folders(
             pass
 
 
-"""
-Sposta i clusters in una nuova cartella
-"""
 def write_nc_bins_from_mdrep_clusters(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_sample: dict[str, str],
     path_nc_bins_folder: str,
     path_bins_folder: str,
 ):
-
     for cluster in cluster_scores.keys():
         sample = cluster_sample[cluster]
         src_bin = os.path.join(path_bins_folder, sample, cluster + ".fna")
@@ -123,15 +102,13 @@ def write_quality_report(
             file.flush()
 
 
-"""
-Scrive a ogni riga ogni contig+il suo cluster
-"""
 def write_final_nc_clusters(
     cluster_scores: dict[str, tuple[float, float]],
     cluster_contigs: dict[str, set[str]],
     path_nc_clusters: str,
 ):
     with open(path_nc_clusters, "w") as file:
+        print(vamb.vambtools.CLUSTERS_HEADER, file=file)
         for nc_cluster in cluster_scores.keys():
             nc_contigs = cluster_contigs[nc_cluster]
             for nc_contig in nc_contigs:
@@ -147,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--d", type=str, help="path to folder that will contain all nc bins"
     )
-    parser.add_argument("--bin_separator", type=str, default=None, help="separator ")
+    parser.add_argument("--bin_separator", type=str, help="separator ")
     parser.add_argument("--comp", type=float, default=0.9, help="Min completeness ")
     parser.add_argument("--cont", type=float, default=0.05, help="Max contamination ")
 

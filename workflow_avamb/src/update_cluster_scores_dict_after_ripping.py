@@ -2,12 +2,7 @@ import numpy as np
 import json
 import argparse
 
-"""
-In breve, la funzione legge i dati dal file CheckM, aggiorna i punteggi di
-completezza e contaminazione per ciascun cluster nel dizionario cluster_score,
-stampando i punteggi prima e dopo l'aggiornamento. Infine, restituisce il
-dizionario aggiornato.
-"""
+
 def update_cluster_score_bin_path(
     path_checkm_ripped: str, cluster_score: dict[str, tuple[float, float]]
 ):
@@ -41,7 +36,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cs_d",
         type=str,
-        help="cluster_score dictionary path, which will be updated for clusters that where ripped either becuase of meaningless edges or when making the component lenght <= 2  ",
+        help="cluster_score dictionary path  ",
+    )
+    parser.add_argument(
+        "--cs_d_o",
+        type=str,
+        help="cluster_score dictionary path updated, updated with tthe information for clusters that where ripped either becuase of meaningless edges or when making the component lenght <= 2  ",
     )
 
     opt = parser.parse_args()
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     with open(opt.cs_d) as f:
         cluster_score = json.load(f)
 
-    cluster_score = update_cluster_score_bin_path(opt.s, cluster_score)
+    cluster_score_ = update_cluster_score_bin_path(opt.s, cluster_score)
 
-    with open(opt.cs_d, "w") as f:
-        json.dump(cluster_score, f)
+    with open(opt.cs_d_o, "w") as f:
+        json.dump(cluster_score_, f)

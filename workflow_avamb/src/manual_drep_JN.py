@@ -34,6 +34,7 @@ def main(
     # max contamination for bin to be included into the dereplication process
     max_cont: float,
     bins_extension: str,
+    min_bin_size: int,
 ) -> None:
     # Load contig names
     contig_names: list[str] = list(np.loadtxt(names, dtype=object))
@@ -51,11 +52,10 @@ def main(
     )
     # Load bins
     (bin_lengths, union_bins) = load_binnings(
-        binnings, contig_names, lengths, bin_by_name
+        binnings, contig_names, lengths, bin_by_name, min_bin_size
     )
     del bin_by_name
 
-    #dereplicate
     dereplicated = dereplicate(union_bins, qualities, lengths, bin_lengths, min_cov)
     del bin_lengths
 
@@ -63,6 +63,7 @@ def main(
         raise FileExistsError(outpath)
 
     with open(outpath, "w") as file:
+        print(vamb.vambtools.CLUSTERS_HEADER, file=file)
         for bin in dereplicated:
             bin_name = bin_names[bin]
             bin_name = bin_name.replace(".fna", "")
@@ -70,9 +71,6 @@ def main(
                 print(bin_name, contig_names[contig], sep="\t", file=file)
 
 
-"""
-Esamina il quality report e filtra fuori i bin non validi
-"""
 def load_checkm2(
     quality_report: dict[str, list],
     min_completeness: float,
@@ -112,27 +110,22 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
-    #bin_names: nomi dei bin validi
-    #qualities: tuple con i punteggi dei bin validi
-    #bin_by_name: dizionario che mappa i bin validi a BinID, gli altri a None
     return (bin_names, qualities, bin_by_name)
 
 
-#un "binning" è una clusterizzazione dei dati in vari bins
 def load_binnings(
     binnings: Sequence[Path],
     contig_names: Sequence[str],
     lengths: np.ndarray,
     bin_by_name: Mapping[str, Optional[BinId]],
+    min_bin_size: int,
 ) -> tuple[list[int], list[set[ContigId]]]:
     """
     Load clusters.tsv files from each binning, and filter away those assigned to be discarded based on CheckM2 data.
     Return bin length and bins, each represented as a set of ContigId
     """
-
-    #il dizionario mappa ogni nome di contig a indice e lunghezza corrispondenti
     id_len_of_contig_name: dict[str, tuple[ContigId, int]] = dict()
-    for (index, (name, length)) in enumerate(zip(contig_names, lengths)):
+    for index, (name, length) in enumerate(zip(contig_names, lengths)):
         id_len_of_contig_name[name] = (ContigId(index), length)
 
     # Load binnings
@@ -144,10 +137,9 @@ def load_binnings(
     for binning_path in binnings:
         with open(binning_path) as file:
             clusters = vamb.vambtools.read_clusters(file)
-            clusters_filtered = filterclusters(clusters, lengthof)
+            clusters_filtered = filterclusters(clusters, lengthof, min_bin_size)
             # filter by clusters larger than 200kbs
-            for (bin_name, contigs) in clusters_filtered.items():
-
+            for bin_name, contigs in clusters_filtered.items():
                 bin_name += ".fna"
                 # None is a valid value, so we use -1 as sentinel for missing
                 bin = bin_by_name.get(bin_name, -1)
@@ -158,7 +150,6 @@ def load_binnings(
                 # Means: Below threshold, so skip it
                 elif bin is None:
                     continue
-                #Else il cluster è valido, lo aggiungo a union_bins
                 else:
                     ids: set[ContigId] = set()
                     for contig in contigs:
@@ -177,24 +168,20 @@ def load_binnings(
         assert isinstance(i, set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
-    #computa la lunghezza dei bins
     for contigs in union_bins_asserted:
         bin_lengths.append(sum(lengths[contig] for contig in contigs))
 
     return (bin_lengths, union_bins_asserted)
 
 
-"""
-Rimuove i clusters troppo piccoli
-"""
 def filterclusters(
-    clusters: Mapping[str, set], lengthof: Mapping[str, int]
+    clusters: Mapping[str, set], lengthof: Mapping[str, int], min_bin_size: int
 ) -> Mapping[str, set]:
     filtered_bins = dict()
     for medoid, contigs in clusters.items():
         binsize = sum(lengthof[contig] for contig in contigs)
 
-        if binsize >= 200000:
+        if binsize >= min_bin_size:
             filtered_bins[medoid] = contigs
 
     return filtered_bins
@@ -217,13 +204,10 @@ def dereplicate(
     return [BinId(i) for i in range(len(bin_lengths)) if BinId(i) not in to_remove]
 
 
-"""
-Associa a ciascuna contig i bins in cui appare
-"""
 def get_binsof(union_bins: Iterable[Iterable[ContigId]]) -> dict[ContigId, list[BinId]]:
     "Makes a dict from contig -> list of bins the contig is present in, if in multiple bins"
     binsof: dict[ContigId, Union[BinId, list[BinId]]] = dict()
-    for (bin_int, contigs) in enumerate(union_bins):
+    for bin_int, contigs in enumerate(union_bins):
         bin = BinId(bin_int)
         for contig in contigs:
             existing = binsof.get(contig)
@@ -240,13 +224,14 @@ def get_binsof(union_bins: Iterable[Iterable[ContigId]]) -> dict[ContigId, list[
 def bin_score(completeness: float, contamination: float) -> float:
     return completeness - 5 * contamination
 
+
 def get_overlapping_bin_pairs(
     binsof: Mapping[ContigId, list[BinId]], qualities: Sequence[tuple[float, float]]
 ) -> Sequence[tuple[BinId, BinId]]:
     "Get a list of pairs of bins that share at least one contig"
     pairs: set[tuple[BinId, BinId]] = set()
     for overlapping_bins in binsof.values():
-        for (a, b) in itertools.combinations(overlapping_bins, r=2):
+        for a, b in itertools.combinations(overlapping_bins, r=2):
             # Order them so we don't have (a, b) and (b, a) as distinct pairs
             if a > b:
                 (a, b) = (b, a)
@@ -256,7 +241,7 @@ def get_overlapping_bin_pairs(
     # If they tie, then use lexographic order (a, b) we added them
     # in above
     result: list[tuple[BinId, BinId]] = []
-    for (a, b) in pairs:
+    for a, b in pairs:
         score_a = bin_score(*qualities[a])
         score_b = bin_score(*qualities[b])
         if score_a > score_b:
@@ -276,7 +261,7 @@ def compute_to_remove(
 ) -> set[BinId]:
     "Create a list of bins to remove because they overlap with another bin"
     result: set[BinId] = set()
-    for (bin_a, bin_b) in overlapping_pairs:
+    for bin_a, bin_b in overlapping_pairs:
         if bin_a in result or bin_b in result:
             continue
 
@@ -310,6 +295,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--bins_extension", type=str, default=".fna", help="Extension of the bins  "
     )
+    parser.add_argument(
+        "--min_bin_size",
+        type=int,
+        help="Min bin length to be considered for dereplication ",
+    )
 
     opt = parser.parse_args()
     args = vars(parser.parse_args())
@@ -326,4 +316,5 @@ if __name__ == "__main__":
         min_comp=opt.comp,
         max_cont=opt.cont,
         bins_extension=opt.bins_extension,
+        min_bin_size=opt.min_bin_size,
     )

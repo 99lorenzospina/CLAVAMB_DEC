@@ -24,6 +24,7 @@ def get_cluster_score_bin_path(
             dtype=str,
             ndmin=2,
         )
+
         for row in c_com_con:
             cluster, com, con = row
             cluster = cast(str, cluster)
@@ -55,6 +56,7 @@ if __name__ == "__main__":
         for bin_ in os.listdir(os.path.join(opt.b, sample)):
             if ".fna" in bin_:
                 bins_set.add(bin_)
+
     cluster_score, bin_path = get_cluster_score_bin_path(opt.s, opt.b, bins_set)
     with open(opt.cs_d, "w") as f:
         json.dump(cluster_score, f)
