@@ -37,7 +37,7 @@ def main(
     # Given all the clusters that have no connection (no intersection) with any other cluster
     # mv them to the final bins folder that contains the final set of NC bins if they are NC
     nc_clusters_unchanged = mv_nc_not_r_nc_bins(
-        cluster_not_r_contigs, cluster_sample, cluster_scores, drep_folder, bin_path
+        cluster_not_r_contigs, cluster_sample, cluster_scores, drep_folder, bin_path, path_run
     )
 
     # Given the checkM2 scores for all ripped bins, create a dictionary
@@ -100,7 +100,7 @@ def get_cluster_sample(cluster_contigs, bin_separator):
 
 """Sposta i bin non ripped (senza intersezioni con altri bin) nella cartella apposita"""
 def mv_nc_not_r_nc_bins(
-    cluster_not_r_contigs, cluster_sample, cluster_scores, drep_folder, bin_path
+    cluster_not_r_contigs, cluster_sample, cluster_scores, drep_folder, bin_path, path_run
 ):
 
     """mv not ripped NC bins from bins folder to drep folder"""
