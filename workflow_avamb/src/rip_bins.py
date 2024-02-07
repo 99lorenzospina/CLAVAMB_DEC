@@ -94,6 +94,7 @@ def get_cluster_length(
     for cluster_name, contigs in cluster_contigs.items():
         cluster_length[cluster_name] = 0
         for contig in contigs:
+            print(contig)
             cluster_length[cluster_name] += contig_length[contig]
     return cluster_length
 
