@@ -15,6 +15,7 @@ from typing import Optional, IO, Union
 from pathlib import PurePath as _PurePath
 from vamb.global_variables import global_separator
 
+CLUSTERS_HEADER = "clustername\tcontigname"
 
 class PushArray:
     """Data structure that allows efficient appending and extending a 1D Numpy array.
