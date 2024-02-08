@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#SBATCH -J ck_airways_transfer
+#SBATCH -J ck_metahit_transfer
 #SBATCH -o /nfsd/bcb/bcbg/spina/output_%j.txt
 #SBATCH -e /nfsd/bcb/bcbg/spina/errors_%j.txt
 #SBATCH -t 00:05:00
@@ -9,9 +9,9 @@
 #SBATCH -x runner-11
 
 # Definizione dei percorsi dei bin finali e del file di output dei cluster
-drep_dir="/nfsd/bcb/bcbg/spina/xamb_checkm_results/airways/Final_bins/"
+drep_dir="/nfsd/bcb/bcbg/spina/xamb_checkm_results/metahit/Final_bins/"
 
-output_file="/nfsd/bcb/bcbg/spina/xamb_checkm_results/airways/xavamb_manual_drep_disjoint_clusters.tsv"
+output_file="/nfsd/bcb/bcbg/spina/xamb_checkm_results/metahit/xavamb_manual_drep_disjoint_clusters.tsv"
 echo 'creating z y v clusters from the final set of bins'
 for s in $(ls $drep_dir)
 do
