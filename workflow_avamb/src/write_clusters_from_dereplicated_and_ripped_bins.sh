@@ -1,13 +1,17 @@
 #!/usr/bin/bash
-while getopts "d:o:" opt; do
-  case $opt in
-    d) drep_dir=$OPTARG    ;;
-    o) clusters_file=$OPTARG    ;;
-    *) echo 'error' >&2
-       exit 1
-  esac
-done
-output_file=$(pwd)/${clusters_file}/avamb/avamb_manual_drep_disjoint_clusters.tsv
+#SBATCH -J ck_airways_transfer
+#SBATCH -o /nfsd/bcb/bcbg/spina/output_%j.txt
+#SBATCH -e /nfsd/bcb/bcbg/spina/errors_%j.txt
+#SBATCH -t 00:05:00
+#SBATCH -n 1
+#SBATCH -p allgroups
+#SBATCH --mem 10G
+#SBATCH -x runner-11
+
+# Definizione dei percorsi dei bin finali e del file di output dei cluster
+drep_dir="/nfsd/bcb/bcbg/spina/xamb_checkm_results/airways/Final_bins/"
+
+output_file="/nfsd/bcb/bcbg/spina/xamb_checkm_results/airways/xavamb_manual_drep_disjoint_clusters.tsv"
 echo 'creating z y v clusters from the final set of bins'
 for s in $(ls $drep_dir)
 do
