@@ -89,7 +89,10 @@ def get_cluster_sample(cluster_contigs, bin_separator):
 
     for cluster, contigs in cluster_contigs.items():
         contig_i = next(iter(contigs))
-        sample = contig_i.split(bin_separator)[0]
+        if bin_separator == None:
+            sample = 'SM'
+        else:
+            sample = contig_i.split(bin_separator)[0]
 
         cluster_sample[cluster] = sample
     return cluster_sample
@@ -337,7 +340,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d", type=str, help="folder name that will contain all nc bins"
     )
-    parser.add_argument("--bin_separator", type=str, help="path ripped bins")
+    parser.add_argument("--bin_separator", type=str, default=None, help="path ripped bins")
     parser.add_argument("--comp", type=float, default=0.9, help="Min completeness ")
     parser.add_argument("--cont", type=float, default=0.05, help="Max contamination ")
 
