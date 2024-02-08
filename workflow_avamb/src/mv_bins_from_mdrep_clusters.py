@@ -55,7 +55,10 @@ def get_cluster_sample(
     for cluster_ in cluster_contigs.keys():
         contigs = cluster_contigs[cluster_]
         contig_i = next(iter(contigs))
-        sample = contig_i.split(bin_separator)[0]
+        if bin_separator == None:
+            sample = 'SM'
+        else:
+            sample = contig_i.split(bin_separator)[0]
         cluster_sample[cluster_] = sample
 
     return cluster_sample
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--d", type=str, help="path to folder that will contain all nc bins"
     )
-    parser.add_argument("--bin_separator", type=str, help="separator ")
+    parser.add_argument("--bin_separator", type=str, default=None, help="separator ")
     parser.add_argument("--comp", type=float, default=0.9, help="Min completeness ")
     parser.add_argument("--cont", type=float, default=0.05, help="Max contamination ")
 
