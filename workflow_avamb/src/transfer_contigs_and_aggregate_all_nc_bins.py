@@ -116,11 +116,14 @@ def mv_nc_not_r_nc_bins(
             trg_bin = os.path.join(
                 path_run, drep_folder, cluster_sample[cluster], cluster + ".fna"
             )
-            print(
-                "Bin %s has no intersection with any other bin so it is directly moved from %s to %s"
-                % (cluster, src_bin, trg_bin)
-            )
-            shutil.move(src_bin, trg_bin)
+            try:
+                shutil.move(src_bin, trg_bin)
+                print(
+                    "Bin %s has no intersection with any other bin so it is directly moved from %s to %s"
+                    % (cluster, src_bin, trg_bin)
+                )
+            except FileNotFoundError:   #already in Final_bins
+                continue
 
             nc_clusters_unchanged.add(cluster)
     return nc_clusters_unchanged
