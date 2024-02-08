@@ -107,6 +107,8 @@ def mv_nc_not_r_nc_bins(
     """mv not ripped NC bins from bins folder to drep folder"""
     nc_clusters_unchanged = set()
     for cluster in cluster_not_r_contigs.keys():
+        if cluster == 'clustername':
+            continue
         comp, cont = cluster_scores[cluster]
         if comp >= min_comp and cont <= max_cont:
             # src_bin=os.path.join(path_bins,cluster_sample[cluster],cluster+'.fna')
