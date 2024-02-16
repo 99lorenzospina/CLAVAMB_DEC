@@ -106,6 +106,7 @@ def load_checkm2(
             bin_names.append(name)
             qualities.append((completeness, contamination))
             bin_by_name[name] = bin
+            print("name, bin: ",  name, bin)
         else:
             bin_by_name[name] = None
 
@@ -168,11 +169,11 @@ def load_binnings(
 
     bin_lengths: list[int] = []
     print("number of bins: ", len(union_bins))
-    for key, value in union_bins.items():
-        print("Chiave:", key)
-        print("Valore:", value)
-        print(type(value))
-        assert isinstance(value, set)
+    for i in range(len(union_bins)):
+        print("Chiave:", i)
+        print("Valore:", union_bins[i])
+        print(type(union_bins[i]))
+        assert isinstance(union_bins[i], set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
     for contigs in union_bins_asserted:
