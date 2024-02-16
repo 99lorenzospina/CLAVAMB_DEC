@@ -189,6 +189,9 @@ def filterclusters(
     for medoid, contigs in clusters.items():
         binsize = sum(lengthof[contig] for contig in contigs)
         if medoid == "aae_y_124":
+            for contig in contigs:
+                print("contig: ", contig)
+                print("of length: ", lengthof[contig])
             print("aae_y_124 has size: ", binsize)
         if binsize >= min_bin_size:
             filtered_bins[medoid] = contigs
