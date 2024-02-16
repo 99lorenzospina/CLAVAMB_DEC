@@ -110,7 +110,6 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
-    print("binbynames: ", bin_by_name)
     return (bin_names, qualities, bin_by_name)
 
 
@@ -144,8 +143,6 @@ def load_binnings(
                 bin_name += ".fna"
                 # None is a valid value, so we use -1 as sentinel for missing
                 bin = bin_by_name.get(bin_name, -1)
-                print("bin_name is: ", bin_name)
-                print("bin is: ", bin)
                 if bin == -1:
                     raise ValueError(
                         f"Bin {bin_name} found in binning {binning_path}, but is not scored by CheckM2"
@@ -154,6 +151,8 @@ def load_binnings(
                 elif bin is None:
                     continue
                 else:
+                    print("bin_name is: ", bin_name)
+                    print("bin is: ", bin)
                     ids: set[ContigId] = set()
                     for contig in contigs:
                         existing = id_len_of_contig_name.get(contig)
@@ -163,6 +162,7 @@ def load_binnings(
                                 "but that name is not present in provided names npz file"
                             )
                         ids.add(existing[0])
+                    print("ids is: ", ids)
                     union_bins[bin] = ids
 
     bin_lengths: list[int] = []
