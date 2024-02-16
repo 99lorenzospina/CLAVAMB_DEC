@@ -140,6 +140,7 @@ def load_binnings(
         with open(binning_path) as file:
             clusters = vamb.vambtools.read_clusters(file)
             clusters_filtered = filterclusters(clusters, lengthof, min_bin_size)
+            print("clusters filtered length: ",len(clusters_filtered))
             # filter by clusters larger than 200kbs
             for bin_name, contigs in clusters_filtered.items():
                 bin_name += ".fna"
