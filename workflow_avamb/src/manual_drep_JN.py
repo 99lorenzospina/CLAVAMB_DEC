@@ -143,6 +143,8 @@ def load_binnings(
                 bin_name += ".fna"
                 # None is a valid value, so we use -1 as sentinel for missing
                 bin = bin_by_name.get(bin_name, -1)
+                print("bin_name is: ", bin_name)
+                print("bin is: ", bin)
                 if bin == -1:
                     raise ValueError(
                         f"Bin {bin_name} found in binning {binning_path}, but is not scored by CheckM2"
