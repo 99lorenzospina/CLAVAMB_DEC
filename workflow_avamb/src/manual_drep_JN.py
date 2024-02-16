@@ -111,7 +111,6 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
-    print("bin_by_name: ", bin_by_name)
     return (bin_names, qualities, bin_by_name)
 
 
@@ -189,7 +188,8 @@ def filterclusters(
     filtered_bins = dict()
     for medoid, contigs in clusters.items():
         binsize = sum(lengthof[contig] for contig in contigs)
-
+        if medoid == "aae_y_124":
+            print("aae_y_124 has size: ", binsize)
         if binsize >= min_bin_size:
             filtered_bins[medoid] = contigs
 
