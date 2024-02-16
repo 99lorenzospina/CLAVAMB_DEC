@@ -163,8 +163,9 @@ def load_binnings(
                     union_bins[bin] = ids
 
     bin_lengths: list[int] = []
-
+    print("number of bins: ", len(union_bins))
     for i in union_bins:
+        print(type(i))
         assert isinstance(i, set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
