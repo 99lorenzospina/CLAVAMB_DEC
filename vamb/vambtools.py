@@ -521,7 +521,7 @@ def write_bins(
 
     byteslen_by_id: dict[str, tuple[bytes, int]] = dict()
     for entry in byte_iterfasta(fastaio):
-        byteslen_by_id[entry.identifier] = (
+        byteslen_by_id[entry.header] = (
             _gzip.compress(entry.format().encode(), compresslevel=1),
             len(entry),
         )
