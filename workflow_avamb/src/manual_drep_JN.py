@@ -110,6 +110,7 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
+    print("bin_by_name: ", bin_by_name)
     return (bin_names, qualities, bin_by_name)
 
 
@@ -167,10 +168,11 @@ def load_binnings(
 
     bin_lengths: list[int] = []
     print("number of bins: ", len(union_bins))
-    for i in union_bins:
-        print(type(i))
-        print(i)
-        assert isinstance(i, set)
+    for key, value in union_bins.items():
+        print("Chiave:", key)
+        print("Valore:", value)
+        print(type(value))
+        assert isinstance(value, set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
     for contigs in union_bins_asserted:
