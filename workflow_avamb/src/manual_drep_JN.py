@@ -110,6 +110,7 @@ def load_checkm2(
             bin_by_name[name] = None
 
     assert sum(1 for i in bin_by_name.values() if isinstance(i, int)) == len(bin_names)
+    print("binbynames: ", bin_by_name)
     return (bin_names, qualities, bin_by_name)
 
 
