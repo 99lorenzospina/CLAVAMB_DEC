@@ -249,15 +249,18 @@ def choose_best_ripped_bin_and_mv_if_nc(
             # bin_A keeps the contigs
             if cluster_A_complet >= min_comp and cluster_A_cont <= max_cont:
                 bin_A_name = cluster_A_r + ".fna"
-                src_bin = bin_path[bin_A_name]
-                trg_bin = os.path.join(
-                    path_run, drep_folder, cluster_sample[cluster_A_r], bin_A_name
-                )
                 try:
-                    shutil.move(src_bin, trg_bin)
-                except FileNotFoundError:
+                    src_bin = bin_path[bin_A_name]
+                    trg_bin = os.path.join(
+                        path_run, drep_folder, cluster_sample[cluster_A_r], bin_A_name
+                    )
+                    try:
+                        shutil.move(src_bin, trg_bin)
+                    except FileNotFoundError:
+                        pass
+                    nc_clusters_unchanged.add(cluster_A_r)
+                except KeyError:    #Already Moved!
                     pass
-                nc_clusters_unchanged.add(cluster_A_r)
                 print("%s keeps the contigs so src_path is %s " % (bin_A_name, src_bin))
             # and bin B not
             if cluster_B_r_complet >= min_comp and cluster_B_r_cont <= max_cont:
@@ -285,15 +288,18 @@ def choose_best_ripped_bin_and_mv_if_nc(
             # bin_B keeps the contigs
             if cluster_B_complet >= min_comp and cluster_B_cont <= max_cont:
                 bin_B_name = cluster_B_r + ".fna"
-                src_bin = bin_path[bin_B_name]
-                trg_bin = os.path.join(
-                    path_run, drep_folder, cluster_sample[cluster_B_r], bin_B_name
-                )
                 try:
-                    shutil.move(src_bin, trg_bin)
-                except FileNotFoundError:
+                    src_bin = bin_path[bin_B_name]
+                    trg_bin = os.path.join(
+                        path_run, drep_folder, cluster_sample[cluster_B_r], bin_B_name
+                    )
+                    try:
+                        shutil.move(src_bin, trg_bin)
+                    except FileNotFoundError:
+                        pass
+                    nc_clusters_unchanged.add(cluster_B_r)
+                except KeyError:
                     pass
-                nc_clusters_unchanged.add(cluster_B_r)
                 print("%s keeps the contigs so src_path is %s " % (bin_B_name, src_bin))
             # and bin A not
             if cluster_A_r_complet >= min_comp and cluster_A_r_cont <= max_cont:
