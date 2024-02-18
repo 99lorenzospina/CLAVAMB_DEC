@@ -115,17 +115,17 @@ def mv_nc_not_r_nc_bins(
         comp, cont = cluster_scores[cluster]
         if comp >= min_comp and cont <= max_cont:
             # src_bin=os.path.join(path_bins,cluster_sample[cluster],cluster+'.fna')
-            src_bin = bin_path[cluster + ".fna"]
-            trg_bin = os.path.join(
-                path_run, drep_folder, cluster_sample[cluster], cluster + ".fna"
-            )
             try:
+                src_bin = bin_path[cluster + ".fna"]
+                trg_bin = os.path.join(
+                    path_run, drep_folder, cluster_sample[cluster], cluster + ".fna"
+                )            
                 shutil.move(src_bin, trg_bin)
                 print(
                     "Bin %s has no intersection with any other bin so it is directly moved from %s to %s"
                     % (cluster, src_bin, trg_bin)
                 )
-            except FileNotFoundError:   #already in Final_bins
+            except (KeyError, FileNotFoundError):   #already in Final_bins
                 continue
 
             nc_clusters_unchanged.add(cluster)
