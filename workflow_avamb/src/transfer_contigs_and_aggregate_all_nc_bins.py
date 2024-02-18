@@ -259,9 +259,9 @@ def choose_best_ripped_bin_and_mv_if_nc(
                     except FileNotFoundError:
                         pass
                     nc_clusters_unchanged.add(cluster_A_r)
+                    print("%s keeps the contigs so src_path is %s " % (bin_A_name, src_bin))
                 except KeyError:    #Already Moved!
                     pass
-                print("%s keeps the contigs so src_path is %s " % (bin_A_name, src_bin))
             # and bin B not
             if cluster_B_r_complet >= min_comp and cluster_B_r_cont <= max_cont:
                 bin_B_ripped_name = cluster_B_r + "--" + cluster_A_r + ".fna"
@@ -298,9 +298,9 @@ def choose_best_ripped_bin_and_mv_if_nc(
                     except FileNotFoundError:
                         pass
                     nc_clusters_unchanged.add(cluster_B_r)
+                    print("%s keeps the contigs so src_path is %s " % (bin_B_name, src_bin))
                 except KeyError:
                     pass
-                print("%s keeps the contigs so src_path is %s " % (bin_B_name, src_bin))
             # and bin A not
             if cluster_A_r_complet >= min_comp and cluster_A_r_cont <= max_cont:
                 bin_A_ripped_name = cluster_A_r + "--" + cluster_B_r + ".fna"
