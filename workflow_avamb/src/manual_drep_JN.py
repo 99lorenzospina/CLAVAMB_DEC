@@ -106,7 +106,6 @@ def load_checkm2(
             bin_names.append(name)
             qualities.append((completeness, contamination))
             bin_by_name[name] = bin
-            print("name, bin: ",  name, bin)
         else:
             bin_by_name[name] = None
 
@@ -139,7 +138,6 @@ def load_binnings(
         with open(binning_path) as file:
             clusters = vamb.vambtools.read_clusters(file)
             clusters_filtered = filterclusters(clusters, lengthof, min_bin_size)
-            print("clusters filtered length: ",len(clusters_filtered))
             # filter by clusters larger than 200kbs
             for bin_name, contigs in clusters_filtered.items():
                 bin_name += ".fna"
@@ -153,8 +151,6 @@ def load_binnings(
                 elif bin is None:
                     continue
                 else:
-                    print("bin_name is: ", bin_name)
-                    print("bin is: ", bin)
                     ids: set[ContigId] = set()
                     for contig in contigs:
                         existing = id_len_of_contig_name.get(contig)
@@ -164,15 +160,10 @@ def load_binnings(
                                 "but that name is not present in provided names npz file"
                             )
                         ids.add(existing[0])
-                    print("ids is: ", ids)
                     union_bins[bin] = ids
 
     bin_lengths: list[int] = []
-    print("number of bins: ", len(union_bins))
     for i in range(len(union_bins)):
-        print("Chiave:", i)
-        print("Valore:", union_bins[i])
-        print(type(union_bins[i]))
         assert isinstance(union_bins[i], set)
     union_bins_asserted: list[set[ContigId]] = union_bins  # type: ignore
 
@@ -188,11 +179,6 @@ def filterclusters(
     filtered_bins = dict()
     for medoid, contigs in clusters.items():
         binsize = sum(lengthof[contig] for contig in contigs)
-        if medoid == "aae_y_124":
-            for contig in contigs:
-                print("contig: ", contig)
-                print("of length: ", lengthof[contig])
-            print("aae_y_124 has size: ", binsize)
         if binsize >= min_bin_size:
             filtered_bins[medoid] = contigs
 
