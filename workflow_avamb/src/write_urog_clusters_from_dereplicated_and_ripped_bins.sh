@@ -9,9 +9,9 @@
 #SBATCH -x runner-11
 
 # Definizione dei percorsi dei bin finali e del file di output dei cluster
-drep_dir="/nfsd/bcb/bcbg/spina/pavamb_checkm_results/urog/Final_bins/"
+drep_dir="/nfsd/bcb/bcbg/spina/xavamb_checkm_results/urog/Final_bins/"
 
-output_file="/nfsd/bcb/bcbg/spina/pavamb_checkm_results/urog/pavamb_manual_drep_disjoint_clusters.tsv"
+output_file="/nfsd/bcb/bcbg/spina/xavamb_checkm_results/urog/xavamb_manual_drep_disjoint_clusters.tsv"
 echo 'creating z y v clusters from the final set of bins'
 for s in $(ls $drep_dir)
 do
