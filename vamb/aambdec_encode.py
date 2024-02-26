@@ -2,6 +2,10 @@
 
 
 import numpy as np
+from collections.abc import Sequence
+from numpy.typing import NDArray
+from vamb.encode import AutomaticWeightedLoss, set_batchsize
+from torch.utils.data.dataset import TensorDataset as _TensorDataset
 from math import log
 import time
 from torch.utils.data.dataset import TensorDataset as TensorDataset
@@ -100,7 +104,7 @@ class AAEDEC(nn.Module):
 
         # discriminator
         self.discriminator = nn.Sequential(
-            nn.Linear(self.input_length, self.h_n),
+            nn.Linear(self.input_len, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
@@ -111,7 +115,7 @@ class AAEDEC(nn.Module):
 
         # critic
         self.critic = nn.Sequential(
-            nn.Linear(self.input_length, self.h_n),
+            nn.Linear(self.input_len, self.h_n),
             nn.LeakyReLU(),
             nn.Linear(self.h_n, int(self.h_n / 2)),
             nn.LeakyReLU(),
@@ -309,7 +313,7 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
             
-            for depths_in, tnfs_in in data_loader:
+            for depths_in, tnfs_in, _, _ in data_loader:
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
                 a = random.random()
@@ -374,13 +378,12 @@ class AAEDEC(nn.Module):
         weight = q**2 / q.sum(0)
         return (weight.t() / weight.sum(1)).t()
     
-    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate,
+    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=None,
               logfile=None):
         #C must be a torch.tensor of centroids (vectors), implicitly labeled by order
         
-        Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
         device = "cuda" if self.usecuda else "cpu"
-        depthstensor, _ = dataloader.dataset.tensors
+        depthstensor, _, _, _ = dataloader.dataset.tensors
         ncontigs, _ = depthstensor.shape
 
         # Pretrain discriminators
@@ -402,7 +405,10 @@ class AAEDEC(nn.Module):
             if "discriminator" in name:
                 disc_params.append(param)
         if self.optimizer_G==None:
-            self.optimizer_G = torch.optim.Adam(disc_params, lr=lrate)   
+            self.optimizer_G = torch.optim.Adam(disc_params, lr=lrate)  
+        self.optimizer_E.param_groups[0]['lr'] = lrate 
+        self.optimizer_D.param_groups[0]['lr'] = self.dis_lr
+        self.optimizer_clusters.param_groups[0]['lr'] = lrate
 
         for i in range(max_iter_dis):
             (
@@ -417,7 +423,7 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
             
-            for depths_in, tnfs_in in data_loader:
+            for depths_in, tnfs_in, _, _ in data_loader:
             
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
@@ -455,20 +461,21 @@ class AAEDEC(nn.Module):
             def __getitem__(self, idx):
                 depths_in, tnfs_in = self.data[idx]
                 return depths_in, tnfs_in, idx
-            
-        data_loader = _DataLoader(dataset=MyDataset(dataloader.dataset),
+        depthstensor, tnftensor, _, _ = dataloader.dataset.tensors
+        data_loader = _DataLoader(dataset=MyDataset(_TensorDataset(depthstensor, tnftensor)),
                                     batch_size=dataloader.batch_size,
-                                    shuffle=True,
+                                    shuffle=False,  #If it's true, I think it's a problem as I don't know who I am clustering exactlu
                                     drop_last=False,
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
         
-        data = torch.Tensor(dataloader.dataset).to(device)
-        encoded,_,_ = self._encode(data, [])
+        data = torch.Tensor(_TensorDataset(depthstensor, tnftensor)).to(device)
+        encoded = self._encode(data, [])
         kmeans = KMeans(n_clusters=self.y_len, n_init=20)
         y_pred = kmeans.fit_predict(encoded.cpu().numpy())
         y_pred_old = y_pred
         self.cluster_layer.data = torch.tensor(kmeans.cluster_centers_).to(device)
+        self.optimizer_D.param_groups[0]['lr'] = lrate
 
         self.train()
         for epoch in range(max_iter):
@@ -488,12 +495,13 @@ class AAEDEC(nn.Module):
                     np.float32) / y_pred.shape[0]
                 y_pred_old = y_pred
 
-                if delta_label < tol:
+                if epoch > 0 and delta_label < tol:
+                    print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
             for batch, (depths_in, tnfs_in, idx) in data_loader:
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                 loss_g = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
-                loss_d = torch.nn.MSEloss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
+                loss_d = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
                 loss_cls = torch.nn.BCEWithLogitsLoss(torch.cat((depths_out, tnfs_out), dim=1), torch.zeros_like(torch.cat((depths_out, tnfs_out), dim=1), device=device))
                 loss_cls += F.kl_div(q.log(), p[idx])
                 D_loss += loss_d.item()
@@ -531,4 +539,40 @@ class AAEDEC(nn.Module):
                     ), file=logfile)
 
                 logfile.flush()
-        return
+        if modelfile is not None:
+            try:
+                self.save(modelfile)
+            except:
+                pass
+        return y_pred   #return the clustering
+
+    def get_dict(
+        self, contignames: Sequence[str], y_pred
+    ) -> tuple[dict[str, set[str]]]:
+        """Retrieve the categorical latent representation (y) of the inputs
+
+        Inputs:
+            dataloader
+            contignames
+
+        Output:
+            y_clusters_dict ({clust_id : [contigs]})
+        """
+        self.eval()
+        index_contigname = 0
+        clust_y_dict: dict[str, set[str]] = dict()
+        with torch.no_grad():
+                for _y in y_pred:
+                    contig_name = contignames[index_contigname]
+                    contig_cluster = np.argmax(_y) + 1
+                    contig_cluster_str = str(contig_cluster)
+
+                    if contig_cluster_str not in clust_y_dict:
+                        clust_y_dict[contig_cluster_str] = set()
+
+                    clust_y_dict[contig_cluster_str].add(contig_name)
+
+                    index_contigname += 1
+                del y_pred
+
+            return clust_y_dict

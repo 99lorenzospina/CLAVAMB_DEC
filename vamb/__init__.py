@@ -43,4 +43,5 @@ from . import mimics
 from . import aamb_encode
 from . import species_number
 from . import global_variables
+from . import aambdec_encode
 from . import _vambtools
