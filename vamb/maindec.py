@@ -17,13 +17,9 @@ import torch
 import datetime
 import time
 import shutil
-import math
 from math import isfinite
-from argparse import Namespace
 from typing import Optional, IO
-import warnings
 from glob import glob
-import random
 from vamb.global_variables import global_separator
 
 _ncpu = os.cpu_count()
