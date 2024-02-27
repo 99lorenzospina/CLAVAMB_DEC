@@ -489,7 +489,7 @@ def main():
     tnfos.add_argument("--fasta", metavar="", nargs='+', help="path to fasta file or paths to fasta files")
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
     tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers for composition [False]')
-    tnfos.add_argument("--use_tnf", action='store_true', default=True, help='Wether to use tnf for composition [True]')
+    tnfos.add_argument("--use_tnf", action='store_true', default=False, help='Wether to use tnf for composition [False]')
     
     # RPKM arguments
     rpkmos = parser.add_argument_group(

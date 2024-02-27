@@ -35,14 +35,14 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class AAEDEC(nn.Module):
     def __init__(
         self,
-        ntnf: int, #103
+        ntnf: int,
         nsamples: int,
-        nhiddens: int, #but it should be a list!
-        nlatent_y: int, #careful: nlatent_y should be the number of estimated clusters
-        lr: float,
-        cri_lr: float,
-        dis_lr: float,
-        _cuda: bool,
+        nhiddens: int = 10, #but it should be a list!
+        nlatent_y: int = 10, #careful: nlatent_y should be the number of estimated clusters
+        lr: float = 1e-3,
+        cri_lr: float = 1e-3,
+        dis_lr: float = 1e-3,
+        _cuda: bool = False,
         optimizer_E = None,
         optimizer_D = None,
         optimizer_G = None,
@@ -50,7 +50,7 @@ class AAEDEC(nn.Module):
         optimizer_clusters = None,
         degrees: int = 1,
         n_enc_1: int = 500,
-        n_enc_2: int = 10,
+        n_enc_2: int = 1000,
     ):
         if nsamples is None:
             raise ValueError(
@@ -84,10 +84,9 @@ class AAEDEC(nn.Module):
             nn.Linear(self.n_enc_1, self.n_enc_2),
             nn.BatchNorm1d(self.n_enc_2),
             nn.LeakyReLU(),
+            nn.Linear(self.n_enc_2, self.h_n),
+            nn.Identity()
         )
-        # latent layers
-        self.mu = nn.Linear(self.n_enc_2, self.h_n)
-
         # decoder
         self.decoder = nn.Sequential(
             nn.Linear(self.h_n, self.n_enc_2),
@@ -97,27 +96,28 @@ class AAEDEC(nn.Module):
             nn.BatchNorm1d(self.n_enc_1),
             nn.LeakyReLU(),
             nn.Linear(self.n_enc_1, self.input_len),
+            nn.Identity()
         )
 
         # discriminator
         self.discriminator = nn.Sequential(
-            nn.Linear(self.input_len, self.h_n),
+            nn.Linear(self.input_len, self.n_enc_1),
             nn.LeakyReLU(),
-            nn.Linear(self.h_n, int(self.h_n / 2)),
+            nn.Linear(self.n_enc_1, self.n_enc_2),
             nn.LeakyReLU(),
-            nn.Linear(int(self.h_n / 2), 1),
+            nn.Linear(self.n_enc_2, self.h_n),
             nn.Sigmoid(),
         )
 
 
         # critic
         self.critic = nn.Sequential(
-            nn.Linear(self.input_len, self.h_n),
+            nn.Linear(self.input_len, self.n_enc_1),
             nn.LeakyReLU(),
-            nn.Linear(self.h_n, int(self.h_n / 2)),
+            nn.Linear(self.n_enc_1, self.n_enc_2),
             nn.LeakyReLU(),
-            nn.AvgPool1d(kernel_size = int(self.h_n / 2)),
-            nn.Identity(),
+            nn.Linear(self.n_enc_2, self.h_n),
+            nn.LeakyReLU(),
         )
 
         self.cluster_layer = Parameter(torch.Tensor(self.y_len, self.h_n))
@@ -136,29 +136,14 @@ class AAEDEC(nn.Module):
             self.cuda()
 
     def _critic(self, c):
-        return self.critic(c)
-    
-    ## Reparametrisation trick
-    def _reparameterization(self, mu, logvar):
-
-        Tensor = torch.cuda.FloatTensor if self.usecuda else torch.FloatTensor
-
-        std = torch.exp(logvar / 2)
-        sampled_z = Variable(Tensor(np.random.normal(0, 1, (mu.size(0), self.ld))))
-
-        if self.usecuda:
-            sampled_z = sampled_z.cuda()
-        z = sampled_z * std + mu
-
-        return z
+        return torch.mean(self.critic(c), dim=1, keepdim=True)
 
     ## Encoder
     def _encode(self, depths, tnfs):
         _input = torch.cat((depths, tnfs), 1)
         x = self.encoder(_input)
-        mu = self.mu(x)
 
-        return mu
+        return x
 
     def y_length(self):
         return self.y_len
@@ -251,19 +236,19 @@ class AAEDEC(nn.Module):
         return mu, depths_out, tnfs_out
     
     def get_q(self, depths_in, tnfs_in):
-        z, depths_out, tnfs_out = self(depths_in, tnfs_in)
+        mu, depths_out, tnfs_out = self(depths_in, tnfs_in)
         # cluster
         q = 1.0 / (1.0 + torch.sum(
-            torch.pow(z.unsqueeze(1) - self.cluster_layer, 2), 2) / self.alpha)
+            torch.pow(mu.unsqueeze(1) - self.cluster_layer, 2), 2) / self.alpha)
         q = q.pow((self.alpha + 1.0) / 2.0)
         q = (q.t() / torch.sum(q, 1)).t()
-        return q, z, depths_out, tnfs_out
+        return q, mu, depths_out, tnfs_out
 
     def pretrain(self, dataloader, max_iter, logfile):
         lr = self.lr
         cri_lr = self.cri_lr
-        depthstensor, tnftensor = dataloader.dataset.tensors
-        ncontigs, nsamples = depthstensor.shape
+        depthstensor, _ = dataloader.dataset.tensors
+        ncontigs, _ = depthstensor.shape
 
         # Initialize generator and critic
 
@@ -364,11 +349,13 @@ class AAEDEC(nn.Module):
         self.eval()
         return
 
-    def discriminator_loss(real_output, fake_output, device):
+    def discriminator_loss(self, real_output, fake_output, device):
+        real_output = torch.mean(self.discriminator(real_output), dim=1, keepdim=True)
+        fake_output = torch.mean(self.discriminator(fake_output), dim=1, keepdim=True)
         real_loss = torch.nn.BCEWithLogitsLoss(real_output, torch.ones_like(real_output, device=device))
         fake_loss = torch.nn.BCEWithLogitsLoss(fake_output, torch.zeros_like(fake_output, device=device))
         total_loss = real_loss + fake_loss
-        return total_loss
+        return total_loss, fake_loss
 
 
     def student_t_distribution(self, q):
@@ -426,7 +413,7 @@ class AAEDEC(nn.Module):
                 tnfs_in.requires_grad = True
                 self.optimizer_G.zero_grad()
                 _, detphs_out, tnfs_out = self(depths_in, tnfs_in)
-                loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1), device)
+                loss,_ = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1), device)
                 loss.backward()
                 self.optimizer_G.step()
                 G_loss += loss.item()
@@ -461,7 +448,7 @@ class AAEDEC(nn.Module):
         depthstensor, tnftensor, _, _ = dataloader.dataset.tensors
         data_loader = _DataLoader(dataset=MyDataset(_TensorDataset(depthstensor, tnftensor)),
                                     batch_size=dataloader.batch_size,
-                                    shuffle=False,  #If it's true, I think it's a problem as I don't know who I am clustering exactlu
+                                    shuffle=False,  #If it's true, I think it's a problem as I don't know who I am clustering exactly
                                     drop_last=False,
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
@@ -501,10 +488,9 @@ class AAEDEC(nn.Module):
                     break   #cannot improve anymore
             for batch, (depths_in, tnfs_in, idx) in data_loader:
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
-                loss_g = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
+                loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
-                loss_cls = torch.nn.BCEWithLogitsLoss(torch.cat((depths_out, tnfs_out), dim=1), torch.zeros_like(torch.cat((depths_out, tnfs_out), dim=1), device=device))
-                loss_cls += F.kl_div(q.log(), p[idx])
+                loss_cls = fake_loss + F.kl_div(q.log(), p[idx])
                 D_loss += loss_d.item()
                 Cls_loss += loss_cls.item()
                 G_loss += loss_g.item()
@@ -514,10 +500,14 @@ class AAEDEC(nn.Module):
                     self.optimizer_D.step()                             
                 else:
                     self.optimizer_E.zero_grad()
-                    self.optimizer_clusters.zero_grad()
+                    self.cluster_layer.grad.zero_()
+                    #self.optimizer_clusters.zero_grad()
                     loss_cls.backward()
                     self.optimizer_E.step() 
-                    self.optimizer_clusters.step()
+                    #self.optimizer_clusters.step()
+                    with torch.no_grad():
+                        # Update centroids using gradient descent
+                        self.cluster_layer.data -= lrate * self.cluster_layer.grad
                     self.optimizer_D.zero_grad()
                     loss_d.backward()
                     self.optimizer_D.step()         

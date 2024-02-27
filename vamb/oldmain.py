@@ -855,7 +855,7 @@ def main():
     tnfos.add_argument('--k', dest='k', metavar='', type=int, default=4, help='k for kmer calculation [4]')
     tnfos.add_argument("--composition", metavar="", help="path to .npz of composition")
     tnfos.add_argument("--use_pc", action='store_true', default=False, help='Wether to use pcmers for composition [False]')
-    tnfos.add_argument("--use_tnf", action='store_true', default=True, help='Wether to use tnf for composition [True]')
+    tnfos.add_argument("--use_tnf", action='store_true', default=False, help='Wether to use tnf for composition [False]')
 
     # Contrastive learning arguments
     contrastiveos = parser.add_argument_group(title='Contrastive learning input')
