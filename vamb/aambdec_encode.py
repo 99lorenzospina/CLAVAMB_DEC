@@ -3,27 +3,20 @@
 
 import numpy as np
 from collections.abc import Sequence
-from numpy.typing import NDArray
-from vamb.encode import AutomaticWeightedLoss, set_batchsize
 from torch.utils.data.dataset import TensorDataset as _TensorDataset
-from math import log
 import time
 from torch.utils.data.dataset import TensorDataset as TensorDataset
 from torch.autograd import Variable
-from torch.distributions.relaxed_categorical import RelaxedOneHotCategorical
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import torch
 import random
-import math
 
 from torch.utils.data import DataLoader as _DataLoader
 from torch.utils.data import Dataset
 from sklearn.cluster import KMeans
 
-from typing import Optional
-from argparse import Namespace
 import torch.nn.functional as F
 
 random_seed = 42
@@ -575,4 +568,4 @@ class AAEDEC(nn.Module):
                     index_contigname += 1
                 del y_pred
 
-            return clust_y_dict
+        return clust_y_dict
