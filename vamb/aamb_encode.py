@@ -660,7 +660,7 @@ class AAE(nn.Module):
             batchsteps_set = set(batchsteps)
         # Get number of features
         depthstensor, tnftensor, _, _ = data_loader.dataset.tensors
-        ncontigs, nsamples = depthstensor.shape
+        ncontigs, _ = depthstensor.shape
 
         # Initialize generator and discriminator
 

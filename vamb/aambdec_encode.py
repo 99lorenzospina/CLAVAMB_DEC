@@ -250,7 +250,7 @@ class AAEDEC(nn.Module):
     def pretrain(self, dataloader, max_iter, logfile):
         lr = self.lr
         cri_lr = self.cri_lr
-        depthstensor, _ = dataloader.dataset.tensors
+        depthstensor = dataloader.dataset.tensors[0]
         ncontigs, _ = depthstensor.shape
 
         # Initialize generator and critic
