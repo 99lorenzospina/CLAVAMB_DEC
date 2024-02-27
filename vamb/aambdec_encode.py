@@ -367,7 +367,7 @@ class AAEDEC(nn.Module):
         weight = q**2 / q.sum(0)
         return (weight.t() / weight.sum(1)).t()
     
-    def train(self, dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=None,
+    def trainmodel(self, dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=None,
               logfile=None):
         #C must be a torch.tensor of centroids (vectors), implicitly labeled by order
         
