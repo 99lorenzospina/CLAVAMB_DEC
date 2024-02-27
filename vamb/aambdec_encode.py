@@ -37,8 +37,8 @@ class AAEDEC(nn.Module):
         self,
         ntnf: int,
         nsamples: int,
-        nhiddens: int = 10, #but it should be a list!
-        nlatent_y: int = 10, #careful: nlatent_y should be the number of estimated clusters
+        nhiddens: int = 10,
+        nlatent_y: int = 100, #careful: nlatent_y should be the number of estimated clusters
         lr: float = 1e-3,
         cri_lr: float = 1e-3,
         dis_lr: float = 1e-3,
@@ -56,6 +56,9 @@ class AAEDEC(nn.Module):
             raise ValueError(
                 f"Number of samples  should be provided to define the encoder input layer as well as the categorical latent dimension, not {nsamples}"
             )
+        
+        if nhiddens is None:
+            nhiddens = 10
 
         super(AAEDEC, self).__init__()
 
