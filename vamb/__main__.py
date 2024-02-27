@@ -198,7 +198,7 @@ def traindec(
     assert len(rpkms) == len(tnfs)
 
     dataloader = vamb.encode.make_dataloader(
-        rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda
+        rpkms, tnfs, lengths, batchsize, destroy=True, cuda=cuda, shuffle=True
     )
     log("Created dataloader", logfile, 1)
     log(f"Number of sequences used: {len(rpkms)}", logfile, 1)

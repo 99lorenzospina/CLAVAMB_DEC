@@ -62,6 +62,7 @@ def make_dataloader(
     batchsize: int = 256,
     destroy: bool = False,
     cuda: bool = False,
+    shuffle: bool = True,
 ) -> _DataLoader:
     """Create a DataLoader from RPKM, TNF and lengths.
 
@@ -141,7 +142,7 @@ def make_dataloader(
         dataset=dataset,
         batch_size=batchsize,
         drop_last=False,
-        shuffle=True,
+        shuffle=shuffle,
         num_workers=n_workers,
         pin_memory=cuda,
     )
