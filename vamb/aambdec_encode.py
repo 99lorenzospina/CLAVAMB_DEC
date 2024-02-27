@@ -314,6 +314,7 @@ class AAEDEC(nn.Module):
     
                 random_samples = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
                 for idx in random_samples:
+                    print("idx is:", idx)
                     # Use the index to access data and target samples
                     d_sample, t_sample = dataloader.dataset[idx]
                     # Process the samples as needed
