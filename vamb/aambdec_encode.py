@@ -264,7 +264,7 @@ class AAEDEC(nn.Module):
             print("\tN of clusters:", self.y_len, file=logfile)
             print("\n\tTraining properties:", file=logfile)
             print("\tN epochs:", max_iter, file=logfile)
-            print("\tStarting batch size:", data_loader.batch_size, file=logfile)
+            print("\tStarting batch size:", dataloader.batch_size, file=logfile)
             print("\tN sequences:", ncontigs, file=logfile)
             print("\tN samples:", self.nsamples, file=logfile, end="\n\n")
 
