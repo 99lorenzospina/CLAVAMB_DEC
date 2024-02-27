@@ -15,10 +15,11 @@ import random
 
 from torch.utils.data import DataLoader as _DataLoader
 from torch.utils.data import Dataset
-#from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans
+'''
 from pyclustering.cluster.kmeans import kmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
-
+'''
 
 import torch.nn.functional as F
 
@@ -467,12 +468,12 @@ class AAEDEC(nn.Module):
         
         data = torch.Tensor(_TensorDataset(depthstensor, tnftensor)).to(device)
         encoded = self._encode(data, [])
+        '''
         initial_centers = kmeans_plusplus_initializer(encoded, self.y_len).initialize()
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
         kmeans = KMeans(n_clusters=self.y_len, n_init=20)
-        y_pred = kmeans.fit_predict(encoded.cpu().numpy())
-        '''
+        y_pred = kmeans.fit_predict(encoded.cpu().numpy())        
         y_pred_old = y_pred
         self.cluster_layer.data = torch.tensor(kmeans.cluster_centers_).to(device)
         self.optimizer_D.param_groups[0]['lr'] = lrate
