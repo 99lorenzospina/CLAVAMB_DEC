@@ -19,8 +19,6 @@ import time
 import shutil
 from math import isfinite
 from typing import Optional, IO
-from glob import glob
-from vamb.global_variables import global_separator
 
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
