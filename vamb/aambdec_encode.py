@@ -51,6 +51,7 @@ class AAEDEC(nn.Module):
         degrees: int = 1,
         n_enc_1: int = 500,
         n_enc_2: int = 1000,
+        alpha: int = 1,
     ):
         if nsamples is None:
             raise ValueError(
@@ -78,6 +79,7 @@ class AAEDEC(nn.Module):
         self.optimizer_G = optimizer_G
         self.n_enc_1 = n_enc_1
         self.n_enc_2 = n_enc_2
+        self.alpha = alpha
 
         # encoder
         self.encoder = nn.Sequential(
