@@ -144,8 +144,12 @@ class AAEDEC(nn.Module):
         return torch.mean(self.critic(c), dim=1, keepdim=True)
 
     ## Encoder
-    def _encode(self, depths, tnfs):
-        _input = torch.cat((depths, tnfs), 1)
+    def _encode(self, depths, tnfs=None):
+        _input = None
+        if tnfs != None:
+            _input = torch.cat((depths, tnfs), 1)
+        else:
+            _input = depths
         x = self.encoder(_input)
 
         return x
@@ -315,19 +319,21 @@ class AAEDEC(nn.Module):
                 random_samples = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
                 # Use the index to access data and target samples
                 i = 0
+                temp = []
                 for idx in random_samples:
-                    if i == 0:
-                        d_sample = dataloader.dataset[idx]
-                    elif i == 1:
-                        t_sample = dataloader.dataset[idx]
-                    elif i == 2:
-                        break
+                    temp[i] = dataloader.dataset[idx]
                     i+=1
-                print(d_sample)
+                    if i == 2:
+                        break
+                print(temp[0])
                 # Process the samples as needed
-                mu = self._encode(d_sample, t_sample)
-                z += mu*a
-                a = 1 - a
+                mu = None
+                z = None
+                a = None
+                for sample in temp:
+                    mu = self._encode(sample)
+                    z += mu*a
+                    a = 1 - a
                 
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
