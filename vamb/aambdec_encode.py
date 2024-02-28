@@ -323,7 +323,7 @@ class AAEDEC(nn.Module):
                     elif i == 2:
                         break
                     i+=1
-                print(d_sample.shape)
+                print(d_sample)
                 # Process the samples as needed
                 mu = self._encode(d_sample, t_sample)
                 z += mu*a
