@@ -316,25 +316,29 @@ class AAEDEC(nn.Module):
                 while(s==a or s == b):
                     s = random.random()
     
-                random_samples = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
-                # Use the index to access data and target samples
+                random_indices = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
+                # U# Inizializzazione dell'indice
                 i = 0
-                temp = []
-                for idx in random_samples:
-                    temp[i] = dataloader.dataset[idx]
-                    i+=1
-                    if i == 2:
-                        break
-                print(temp[0])
+                random_samples = []
+
+                # Iterazione sui campioni casuali
+                for idx in random_indices:
+                    random_samples.append(dataloader.dataset[idx])
+                    i += 1  # Incrementa l'indice
+                    if i >= 2:
+                        break  # Esce dal loop dopo aver raccolto due campioni
+
+                print(random_samples[0])  # Stampa il primo campione raccolto
                 # Process the samples as needed
                 mu = None
                 z = None
                 a = None
-                for sample in temp:
+                for sample in random_samples:
                     mu = self._encode(sample)
                     z += mu*a
                     a = 1 - a
-                
+                del random_indices
+                del random_samples
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
                 mu = self._encode(depths_in, tnfs_in)
