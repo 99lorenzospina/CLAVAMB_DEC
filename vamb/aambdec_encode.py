@@ -331,8 +331,6 @@ class AAEDEC(nn.Module):
                 print(random_samples[0])  # Stampa il primo campione raccolto
                 # Process the samples as needed
                 mu = None
-                z = None
-                a = None
                 for sample in random_samples:
                     mu = self._encode(sample)
                     z += mu*a
