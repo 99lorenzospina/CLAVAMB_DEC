@@ -328,7 +328,8 @@ class AAEDEC(nn.Module):
                     if i >= 2:
                         break  # Esce dal loop dopo aver raccolto due campioni
 
-                print(random_samples[0])  # Stampa il primo campione raccolto
+                print("Il primo random sample è: ", random_samples[0])  # Stampa il primo campione raccolto
+                print("La lunghezza di un input dovrebbe essere: ", self.input_len)
                 # Process the samples as needed
                 mu = None
                 for sample in random_samples:
