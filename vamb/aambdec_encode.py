@@ -293,7 +293,6 @@ class AAEDEC(nn.Module):
         self.train()
         for iter in range(max_iter):
             time_epoch_0 = time.time()
-            self.train()
             (
                 CRIT_LOSS,
                 ED_LOSS,
@@ -405,8 +404,6 @@ class AAEDEC(nn.Module):
                     ), file=logfile)
 
                 logfile.flush()
-
-        self.eval()
         return
 
     def discriminator_loss(self, real_output, fake_output, device):
