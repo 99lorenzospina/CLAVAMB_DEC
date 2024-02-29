@@ -141,7 +141,7 @@ class AAEDEC(nn.Module):
             self.cuda()
 
     def _critic(self, c):
-        return self.critic(c)
+        return torch.mean(self.critic(c), dim=1, keepdim=True)
 
     ## Encoder
     def _encode(self, depths, tnfs=None):
@@ -362,6 +362,7 @@ class AAEDEC(nn.Module):
                 outs = torch.cat((depths_out, tnfs_out), dim=1)
 
                 ed_loss = (ins - outs).pow(2).sum(dim=1).mean()
+                print("self.critic is:", self._critic(x)[0])
                 ed_loss += s*(self._critic(x)[0].pow(2).sum(dim=1).mean())
                 ed_loss.backward()                
                 self.optimizer_E.step()
