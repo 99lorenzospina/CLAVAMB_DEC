@@ -307,6 +307,9 @@ class AAEDEC(nn.Module):
             for depths_in, tnfs_in, _, _ in data_loader:
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
+                if self.usecuda:
+                    depths_in = depths_in.cuda()
+                    tnfs_in = tnfs_in.cuda()
                 a = random.random()
                 b = random.random()
                 s = random.random()
@@ -328,12 +331,12 @@ class AAEDEC(nn.Module):
                     if i >= 2:
                         break  # Esce dal loop dopo aver raccolto due campioni
 
-                print("Il primo random sample è: ", random_samples[0])  # Stampa il primo campione raccolto
-                print("La lunghezza di un input dovrebbe essere: ", self.input_len)
                 # Process the samples as needed
                 mu = None
                 for sample in random_samples:
                     input_sample = torch.cat((sample[0], sample[1]),0)
+                    if self.usecuda:
+                        input_sample = input_sample.cuda()
                     mu = self._encode(input_sample)
                     z += mu*a
                     a = 1 - a
@@ -438,6 +441,9 @@ class AAEDEC(nn.Module):
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
                 self.optimizer_G.zero_grad()
+                if self.usecuda:
+                    depths_in = depths_in.cuda()
+                    tnfs_in = tnfs_in.cuda()
                 _, detphs_out, tnfs_out = self(depths_in, tnfs_in)
                 loss,_ = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((detphs_out, tnfs_out), dim=1), device)
                 loss.backward()
