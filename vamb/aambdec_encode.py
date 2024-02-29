@@ -337,6 +337,8 @@ class AAEDEC(nn.Module):
                     depths.cuda()
                     tnfs.cuda()
 
+                self.eval()
+
                 # Process the two random samples
                 mu = self._encode(depths, tnfs)
                 factor1 = torch.tensor(a)
@@ -352,6 +354,8 @@ class AAEDEC(nn.Module):
 
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
+
+                self.train()
                 mu = self._encode(depths_in, tnfs_in)
                 depths_out, tnfs_out = self._decode(mu)
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in)) + (1-b)*torch.cat((depths_out, tnfs_out))).pow(2).sum(dim=1).mean()
