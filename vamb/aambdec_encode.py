@@ -355,13 +355,14 @@ class AAEDEC(nn.Module):
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
                 crit_loss = torch.abs(self._critic(x) - factor1)**2
+                temp = torch.abs(self._critic(x))**2
 
                 self.train()
                 mu = self._encode(depths_in, tnfs_in)
                 depths_out, tnfs_out = self._decode(mu)
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)).pow(2).sum(dim=1).mean()
                 crit_loss += reg_term
-                ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(self._critic(x))**2
+                ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=0).mean() + s*temp
 
                 ed_loss.backward()                
                 self.optimizer_E.step()
