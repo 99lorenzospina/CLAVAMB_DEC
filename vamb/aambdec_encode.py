@@ -354,7 +354,7 @@ class AAEDEC(nn.Module):
 
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
-                crit_loss = torch.abs(self._critic(x) - torch.tensor(a, torch.float))**2
+                crit_loss = torch.abs(self._critic(x) - factor1)**2
 
                 self.train()
                 mu = self._encode(depths_in, tnfs_in)
