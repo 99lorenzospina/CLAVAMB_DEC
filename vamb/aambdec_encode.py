@@ -333,7 +333,7 @@ class AAEDEC(nn.Module):
                 # Process the samples as needed
                 mu = None
                 for sample in random_samples:
-                    mu = self._encode(sample)
+                    mu = self._encode(sample[0], sample[1])
                     z += mu*a
                     a = 1 - a
                 del random_indices
