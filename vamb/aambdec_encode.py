@@ -333,7 +333,8 @@ class AAEDEC(nn.Module):
                 # Process the samples as needed
                 mu = None
                 for sample in random_samples:
-                    mu = self._encode(sample[0], sample[1])
+                    input_sample = torch.cat((sample[0], sample[1]),0)
+                    mu = self._encode(input_sample)
                     z += mu*a
                     a = 1 - a
                 del random_indices
