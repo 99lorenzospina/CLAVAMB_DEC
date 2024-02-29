@@ -348,6 +348,7 @@ class AAEDEC(nn.Module):
                 mu[0] *=factor1
                 mu[1] *=factor2
                 z = mu[0] + mu[1]
+                z.unsqueeze(0)
 
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
