@@ -150,6 +150,8 @@ class AAEDEC(nn.Module):
             _input = torch.cat((depths, tnfs), 1)
         else:
             _input = depths
+        if self.usecuda:
+            _input = _input.cuda()
         x = self.encoder(_input)
 
         return x
@@ -339,10 +341,14 @@ class AAEDEC(nn.Module):
                 mu = self._encode(depths, tnfs)
                 factor1 = torch.tensor(a)
                 factor2 = 1 - factor1
+                if self.usecuda:
+                    factor1.cuda()
+                    factor2.cuda()
+
                 mu[0] *=factor1
                 mu[1] *=factor2
                 z = mu[0] + mu[1]
-                
+
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
                 mu = self._encode(depths_in, tnfs_in)
