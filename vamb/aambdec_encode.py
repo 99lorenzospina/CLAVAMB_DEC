@@ -358,8 +358,9 @@ class AAEDEC(nn.Module):
                 z = torch.cat((z, z), dim = 0)
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
+                temp_loss = torch.nn.MSELoss(reduction='mean')
 
-                ed_loss = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
+                ed_loss = temp_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
                 ed_loss += s*torch.norm(self._critic(x)[0], p=2)
                 ed_loss.backward()                
                 self.optimizer_E.step()
