@@ -363,10 +363,13 @@ class AAEDEC(nn.Module):
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)).pow(2).sum(dim=1).mean()
                 crit_loss += reg_term
                 ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=0).mean() + s*temp
-
+                
+                self.optimizer_E.zero_grad()
+                self.optimizer_D.zero_grad()
                 ed_loss.backward()                
                 self.optimizer_E.step()
                 self.optimizer_D.step()
+                self.optimizer_C.zero_grad()
                 crit_loss.backward()
                 self.optimizer_C.step()
 
