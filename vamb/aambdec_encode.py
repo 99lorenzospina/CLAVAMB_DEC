@@ -359,7 +359,8 @@ class AAEDEC(nn.Module):
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
 
-                ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=0).mean() + s*torch.abs(self._critic(x)[0])**2
+                ed_loss = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out)))
+                ed_loss += s*torch.norm(self._critic(x)[0], p=2)
                 ed_loss.backward()                
                 self.optimizer_E.step()
                 self.optimizer_D.step()
@@ -379,8 +380,8 @@ class AAEDEC(nn.Module):
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
 
-                reg_term = self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)).pow(2).sum(dim=1).mean()
-                crit_loss = torch.abs(self._critic(x)[0] - factor1)**2 + reg_term
+                reg_term = torch.norm(self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)), p=2)
+                crit_loss = torch.norm(self._critic(x)[0] - factor1, p=2) + reg_term
                 crit_loss.backward()
                 self.optimizer_C.step()
 
