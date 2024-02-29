@@ -313,35 +313,36 @@ class AAEDEC(nn.Module):
                 a = random.random()
                 b = random.random()
                 s = random.random()
-                z = torch.zeros(self.y_len)
                 while(b==a):
                     b = random.random()
                 while(s==a or s == b):
                     s = random.random()
     
-                random_indices = torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2)
-                # U# Inizializzazione dell'indice
-                i = 0
-                random_samples = []
+                random_indices = list(torch.utils.data.RandomSampler(dataloader.dataset, replacement=False, num_samples=2))
+                depth1, depth2 = [dataloader.dataset[i][0] for i in random_indices]
+                tnf1, tnf2 = [dataloader.dataset[i][1] for i in random_indices]
 
-                # Iterazione sui campioni casuali
-                for idx in random_indices:
-                    random_samples.append(dataloader.dataset[idx])
-                    i += 1  # Incrementa l'indice
-                    if i >= 2:
-                        break  # Esce dal loop dopo aver raccolto due campioni
-
-                # Process the samples as needed
-                mu = None
-                for sample in random_samples:
-                    input_sample = torch.cat((sample[0], sample[1]),0)
-                    if self.usecuda:
-                        input_sample = input_sample.cuda()
-                    mu = self._encode(input_sample)
-                    z += mu*a
-                    a = 1 - a
                 del random_indices
-                del random_samples
+
+                depth1 = depth1.unsqueeze(0)
+                depth2 = depth2.unsqueeze(0)
+                tnf1 = tnf1.unsqueeze(0)
+                tnf2 = tnf2.unsqueeze(0)
+                depths = torch.cat([depth1, depth2], dim=0)
+                tnfs = torch.cat([tnf1, tnf2], dim=0)
+
+                if self.usecuda:
+                    depths.cuda()
+                    tnfs.cuda()
+
+                # Process the two random samples
+                mu = self._encode(depths, tnfs)
+                factor1 = torch.tensor(a)
+                factor2 = 1 - factor1
+                mu[0] *=factor1
+                mu[1] *=factor2
+                z = mu[0] + mu[1]
+                
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out))
                 mu = self._encode(depths_in, tnfs_in)
