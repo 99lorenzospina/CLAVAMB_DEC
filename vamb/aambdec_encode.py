@@ -141,7 +141,7 @@ class AAEDEC(nn.Module):
             self.cuda()
 
     def _critic(self, c):
-        return torch.mean(self.critic(c), dim=1, keepdim=True)
+        return self.critic(c)
 
     ## Encoder
     def _encode(self, depths, tnfs=None):
