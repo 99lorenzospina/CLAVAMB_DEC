@@ -268,7 +268,7 @@ class AAEDEC(nn.Module):
             print("\tCUDA:", self.usecuda, file=logfile)
             print("\tAlpha:", self.alpha, file=logfile)
             print("\tN of clusters:", self.y_len, file=logfile)
-            print("\n\tTraining properties:", file=logfile)
+            print("\n\tPretraining properties:", file=logfile)
             print("\tN epochs:", max_iter, file=logfile)
             print("\tStarting batch size:", dataloader.batch_size, file=logfile)
             print("\tN sequences:", ncontigs, file=logfile)
@@ -359,6 +359,7 @@ class AAEDEC(nn.Module):
                 z = torch.cat((z, z), dim = 0)
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
+
                 ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=0).mean() + s*torch.abs(self._critic(x)[0])**2
                 ed_loss.backward()                
                 self.optimizer_E.step()
@@ -378,10 +379,13 @@ class AAEDEC(nn.Module):
                 z = torch.cat((z, z), dim = 0)
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
+
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)).pow(2).sum(dim=1).mean()
                 crit_loss = torch.abs(self._critic(x)[0] - factor1)**2 + reg_term
                 crit_loss.backward()
                 self.optimizer_C.step()
+
+
 
                 ED_LOSS += ed_loss.item()
                 CRIT_LOSS += crit_loss.item()
@@ -429,15 +433,9 @@ class AAEDEC(nn.Module):
         # Pretrain discriminators
 
         if logfile is not None:
-            print("\tNetwork properties:", file=logfile)
-            print("\tCUDA:", self.usecuda, file=logfile)
-            print("\tAlpha:", self.alpha, file=logfile)
-            print("\tN clusters:", self.y_len, file=logfile)
             print("\n\tTraining properties:", file=logfile)
             print("\tN Training epochs:", max_iter, file=logfile)
-            print("\tStarting batch size:", data_loader.batch_size, file=logfile)
-            print("\tN sequences:", ncontigs, file=logfile)
-            print("\tN samples:", self.nsamples, file=logfile, end="\n\n")
+            print("\tStarting batch size:", data_loader.batch_size, file=logfile, end="\n\n")
 
         disc_params = []
 
