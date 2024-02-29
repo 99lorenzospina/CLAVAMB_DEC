@@ -353,13 +353,14 @@ class AAEDEC(nn.Module):
                 z = z.unsqueeze(0)
 
                 r_depths_out, r_tnfs_out = self._decode(z)
-                x = torch.cat((r_depths_out, r_tnfs_out))
+                x = torch.cat((r_depths_out, r_tnfs_out), 1)
+                crit_loss = torch.abs(self._critic(x) - torch.tensor(a, torch.float))**2
 
                 self.train()
                 mu = self._encode(depths_in, tnfs_in)
                 depths_out, tnfs_out = self._decode(mu)
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in)) + (1-b)*torch.cat((depths_out, tnfs_out))).pow(2).sum(dim=1).mean()
-                crit_loss = torch.abs(self._critic(x) - torch.tensor(a, torch.float))**2 + reg_term
+                crit_loss += reg_term
                 ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in)), torch.cat((depths_out, tnfs_out)), 2).pow(2)).sum(dim=1).mean() + s*torch.abs(self._critic(x))**2
 
                 ed_loss.backward()                
