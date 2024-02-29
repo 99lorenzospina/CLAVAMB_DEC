@@ -338,34 +338,46 @@ class AAEDEC(nn.Module):
                     tnfs.cuda()
 
                 # Process the two random samples
-                mu = self._encode(depths, tnfs)
                 factor1 = torch.tensor(a)
                 factor2 = 1 - factor1
                 if self.usecuda:
                     factor1.cuda()
                     factor2.cuda()
+                
 
+                ###TRAINING Autoencoder
+                self.optimizer_E.zero_grad()
+                self.optimizer_D.zero_grad()
+                mu = self._encode(depths_in, tnfs_in)
+                depths_out, tnfs_out = self._decode(mu)
+
+                mu = self._encode(depths, tnfs)
                 mu[0] *=factor1
                 mu[1] *=factor2
                 z = mu[0] + mu[1]
                 z = z.unsqueeze(0)
                 z = torch.cat((z, z), dim = 0)
-
                 r_depths_out, r_tnfs_out = self._decode(z)
                 x = torch.cat((r_depths_out, r_tnfs_out), 1)
-                
-                self.optimizer_E.zero_grad()
-                self.optimizer_D.zero_grad()
-                mu = self._encode(depths_in, tnfs_in)
-                depths_out, tnfs_out = self._decode(mu)
                 ed_loss = (torch.dist(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), 2).pow(2)).sum(dim=0).mean() + s*torch.abs(self._critic(x)[0])**2
                 ed_loss.backward()                
                 self.optimizer_E.step()
                 self.optimizer_D.step()
 
+
+                ###TRAINING Critic
                 self.optimizer_C.zero_grad()
                 mu = self._encode(depths_in, tnfs_in)
                 depths_out, tnfs_out = self._decode(mu)
+
+                mu = self._encode(depths, tnfs)
+                mu[0] *=factor1
+                mu[1] *=factor2
+                z = mu[0] + mu[1]
+                z = z.unsqueeze(0)
+                z = torch.cat((z, z), dim = 0)
+                r_depths_out, r_tnfs_out = self._decode(z)
+                x = torch.cat((r_depths_out, r_tnfs_out), 1)
                 reg_term = self._critic(b*torch.cat((depths_in, tnfs_in), dim=1) + (1-b)*torch.cat((depths_out, tnfs_out), dim=1)).pow(2).sum(dim=1).mean()
                 crit_loss = torch.abs(self._critic(x)[0] - factor1)**2 + reg_term
                 crit_loss.backward()
