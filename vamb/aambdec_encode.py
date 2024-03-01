@@ -268,7 +268,7 @@ class AAEDEC(nn.Module):
             print("\tCUDA:", self.usecuda, file=logfile)
             print("\tAlpha:", self.alpha, file=logfile)
             print("\tN of clusters:", self.y_len, file=logfile)
-            print("\n\tPretraining properties:", file=logfile)
+            print("\n\tPretraining generator and critic properties:", file=logfile)
             print("\tN epochs:", max_iter, file=logfile)
             print("\tStarting batch size:", dataloader.batch_size, file=logfile)
             print("\tN sequences:", ncontigs, file=logfile)
@@ -433,12 +433,8 @@ class AAEDEC(nn.Module):
         # Pretrain discriminators
 
         if logfile is not None:
-            print("\n\tTraining properties:", file=logfile)
+            print("\n\tPretraining discriminators properties:", file=logfile)
             print("\tN Pretraining epochs:", max_iter_dis, file=logfile)
-            print("\tN Auxiliary epochs:", aux_iter, file=logfile)
-            print("\tN Training epochs:", max_iter, file=logfile)
-            print("\tN Target iters:", targ_iter, file=logfile)
-            print("\tN Tolerance:", tol, file=logfile)
             print("\tStarting batch size:", dataloader.batch_size, file=logfile, end="\n\n")
 
         disc_params = []
@@ -493,6 +489,14 @@ class AAEDEC(nn.Module):
                 logfile.flush()
 
         #Clustering phase
+
+        if logfile is not None:
+            print("\n\ Training properties:", file=logfile)
+            print("\tN Auxiliary epochs:", aux_iter, file=logfile)
+            print("\tN Training epochs:", max_iter, file=logfile)
+            print("\tN Target iters:", targ_iter, file=logfile)
+            print("\tN Tolerance:", tol, file=logfile)
+            print("\tStarting batch size:", dataloader.batch_size, file=logfile, end="\n\n")
 
         class MyDataset(Dataset):
             def __init__(self, data):
