@@ -491,7 +491,7 @@ class AAEDEC(nn.Module):
         #Clustering phase
 
         if logfile is not None:
-            print("\n\ Training properties:", file=logfile)
+            print("\n Training properties:", file=logfile)
             print("\tN Auxiliary epochs:", aux_iter, file=logfile)
             print("\tN Training epochs:", max_iter, file=logfile)
             print("\tN Target iters:", targ_iter, file=logfile)
@@ -516,7 +516,7 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
         
-        data = torch.Tensor(_TensorDataset(depthstensor, tnftensor)).to(device)
+        data = torch.tensor(_TensorDataset(depthstensor, tnftensor)).to(device)
         encoded = self._encode(data, [])
         '''
         initial_centers = kmeans_plusplus_initializer(encoded, self.y_len).initialize()
