@@ -438,7 +438,7 @@ class AAEDEC(nn.Module):
             print("\tN Training epochs:", max_iter, file=logfile)
             print("\tN Target iters:", targ_iter, file=logfile)
             print("\tN Tolerance:", tol, file=logfile)
-            print("\tStarting batch size:", data_loader.batch_size, file=logfile, end="\n\n")
+            print("\tStarting batch size:", dataloader.batch_size, file=logfile, end="\n\n")
 
         disc_params = []
 
