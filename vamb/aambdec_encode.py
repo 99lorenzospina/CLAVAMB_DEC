@@ -362,8 +362,6 @@ class AAEDEC(nn.Module):
                 outs = torch.cat((depths_out, tnfs_out), dim=1)
 
                 ed_loss = (ins - outs).pow(2).sum(dim=1).mean()
-                print("ed_loss is:", ed_loss)
-                print("self.critic is:", self._critic(x)[0])
                 ed_loss += s*(self._critic(x)[0].pow(2).mean())
                 ed_loss.backward()                
                 self.optimizer_E.step()

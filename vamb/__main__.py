@@ -586,15 +586,15 @@ def main():
 
     aaetrainos.add_argument('--lrate_aae', dest='lrate',  metavar='',type=float,
                         default=1e-4, help='learning rate for AAEDEC training [0.0001]')
-    aaetrainos.add_argument('--max_iter_aae', dest='max_iter',  metavar='',type=float,
+    aaetrainos.add_argument('--max_iter_aae', dest='max_iter',  metavar='',type=int,
                         default=300, help='maximum number of iterations in training [300]')
-    aaetrainos.add_argument('--max_iter_dis_aae', dest='max_iter_dis',  metavar='',type=float,
+    aaetrainos.add_argument('--max_iter_dis_aae', dest='max_iter_dis',  metavar='',type=int,
                         default=200, help='maximum number of iterations in discriminator pretraining [200]')
-    aaetrainos.add_argument('--aux_iter_aae', dest='aux_iter',  metavar='',type=float,
+    aaetrainos.add_argument('--aux_iter_aae', dest='aux_iter',  metavar='',type=int,
                         default=10, help='auxiliary threshold in training [10]')
-    aaetrainos.add_argument('--targ_iter_aae', dest='targ_iter',  metavar='',type=float,
+    aaetrainos.add_argument('--targ_iter_aae', dest='targ_iter',  metavar='',type=int,
                         default=10, help='batchstep update [10]')
-    aaetrainos.add_argument('--max_iter_pretrain_aae', dest='max_iter_pretrain',  metavar='',type=float,
+    aaetrainos.add_argument('--max_iter_pretrain_aae', dest='max_iter_pretrain',  metavar='',type=int,
                         default=2000, help='maximum number of iterations in critic training [2000]')
     aaetrainos.add_argument('--tol_aae', dest='tol',  metavar='',type=float,
                         default=1e-6, help='tollerance threshold [0.0001%]')
