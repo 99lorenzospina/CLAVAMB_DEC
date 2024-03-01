@@ -516,7 +516,7 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
         
-        data = torch.tensor(_TensorDataset(depthstensor, tnftensor)).to(device)
+        data = torch.cat((depthstensor, tnftensor), dim=1).to(device)
         encoded = self._encode(data, [])
         '''
         initial_centers = kmeans_plusplus_initializer(encoded, self.y_len).initialize()
@@ -525,7 +525,7 @@ class AAEDEC(nn.Module):
         kmeans = KMeans(n_clusters=self.y_len, n_init=20)
         y_pred = kmeans.fit_predict(encoded.cpu().numpy())        
         y_pred_old = y_pred
-        self.cluster_layer.data = torch.tensor(kmeans.cluster_centers_).to(device)
+        self.cluster_layer.data = torch.Tensor(kmeans.cluster_centers_).to(device)
         self.optimizer_D.param_groups[0]['lr'] = lrate
 
         self.train()
