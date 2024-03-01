@@ -413,8 +413,9 @@ class AAEDEC(nn.Module):
     def discriminator_loss(self, real_output, fake_output, device):
         real_output = torch.mean(self.discriminator(real_output), dim=1, keepdim=True)
         fake_output = torch.mean(self.discriminator(fake_output), dim=1, keepdim=True)
-        real_loss = torch.nn.BCEWithLogitsLoss(real_output, torch.ones_like(real_output, device=device))
-        fake_loss = torch.nn.BCEWithLogitsLoss(fake_output, torch.zeros_like(fake_output, device=device))
+        loss = torch.nn.BCEWithLogitsLoss()
+        real_loss = loss(real_output, torch.ones_like(real_output, device=device))
+        fake_loss = loss(fake_output, torch.zeros_like(fake_output, device=device))
         total_loss = real_loss + fake_loss
         return total_loss, fake_loss
 
