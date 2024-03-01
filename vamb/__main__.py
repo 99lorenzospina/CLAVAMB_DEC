@@ -211,7 +211,7 @@ def traindec(
         log("Created AAE", logfile, 1)
         modelpath = os.path.join(outdir, 'aaedec_model.pt')
         aaedec.pretrain(dataloader, max_iter_pretrain, logfile)
-        y_pred = aaedec.trainmodel(dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=modelpath)
+        y_pred = aaedec.trainmodel(dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=modelpath, logfile=logfile)
     else:   #NOT WORKING: I should save also former y_preds and start retraining and also updating y_pred, dunno wether to do it
         modelpath = os.path.join(outdir, 'aaedec_model.pt')
         log("Loaded AAE", logfile, 1)

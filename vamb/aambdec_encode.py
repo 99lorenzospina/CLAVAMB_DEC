@@ -428,14 +428,16 @@ class AAEDEC(nn.Module):
         #C must be a torch.tensor of centroids (vectors), implicitly labeled by order
         
         device = "cuda" if self.usecuda else "cpu"
-        depthstensor, _, _, _ = dataloader.dataset.tensors
-        ncontigs, _ = depthstensor.shape
 
         # Pretrain discriminators
 
         if logfile is not None:
             print("\n\tTraining properties:", file=logfile)
+            print("\tN Pretraining epochs:", max_iter_dis, file=logfile)
+            print("\tN Auxiliary epochs:", aux_iter, file=logfile)
             print("\tN Training epochs:", max_iter, file=logfile)
+            print("\tN Target iters:", targ_iter, file=logfile)
+            print("\tN Tolerance:", tol, file=logfile)
             print("\tStarting batch size:", data_loader.batch_size, file=logfile, end="\n\n")
 
         disc_params = []
@@ -450,9 +452,7 @@ class AAEDEC(nn.Module):
         self.optimizer_clusters.param_groups[0]['lr'] = lrate
 
         for i in range(max_iter_dis):
-            (
-            G_loss,
-            ) = (0)
+            G_loss = 0
             time_epoch_0 = time.time()
             self.train()
             data_loader = _DataLoader(dataset=dataloader.dataset,
@@ -544,7 +544,7 @@ class AAEDEC(nn.Module):
                 if epoch > 0 and delta_label < tol:
                     print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
-            for batch, (depths_in, tnfs_in, idx) in data_loader:
+            for _, (depths_in, tnfs_in, idx) in data_loader:
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
