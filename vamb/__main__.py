@@ -276,6 +276,52 @@ def write_fasta(
     elapsed = round(time.time()/60 - begintime, 2)
     log(f"Wrote FASTA in {elapsed} minutes", logfile, 1)
 
+def apply_mask(composition, abundance, mask, logfile=None):
+    begintime = time.time()/60
+    data_list = []
+
+    # Read the file and extract the content
+    with open(mask, 'r') as file:
+        content = file.read().strip()
+
+    # Remove square brackets and split the content by commas
+    content = content.replace('[', '').replace(']', '').replace("'", '')
+    data_list = content.split(', ')
+
+    # Remove the newline character from the last element
+    data_list[-1] = data_list[-1].rstrip('\n')
+    if logfile is not None:
+        print(f"\nApplying mask of {len(data_list)} contigs", file=logfile)
+
+    # Create a copy of composition.metadata.identifiers and composition.metadata.lengths
+    identifiers_copy = composition.metadata.identifiers[:]
+    lengths_copy = composition.metadata.lengths[:]
+    mask_copy = composition.metadata.mask[:]
+    matrix_copy = composition.matrix[:]
+    minlength = composition.metadata.minlength
+    l = len(lengths_copy)
+    del composition
+
+    # Find indices of elements to remove
+    indices = [identifiers_copy.index(item) for item in data_list]
+    # Remove elements from identifiers_copy and composition_metadata_lengths
+    identifiers_copy = [item for item in identifiers_copy if item not in data_list]
+    lengths_copy = [lengths_copy[i] for i in range(l) if i not in indices]
+    for i in indices:
+        mask_copy[i] = False
+    matrix_copy = np.delete(matrix_copy, indices, axis=0)
+
+    abundance = np.delete(abundance, indices, axis=0)
+    composition = vamb.parsecontigs.Composition(vamb.parsecontigs.CompositionMetaData(
+                    identifiers_copy, lengths_copy, mask_copy, minlength), matrix_copy)
+
+    timepoint_gernerate_input=time.time()/60
+    time_generating_input= round(timepoint_gernerate_input-begintime,2)   
+
+    if logfile is not None:
+        print(f"\nMask applied in {time_generating_input} minutes", file=logfile)
+        print(f"\t{len(identifiers_copy)} contigs have remained", file=logfile, end="\n\n")
+    return composition, abundance
 
 def run(
     outdir: str,
@@ -284,6 +330,7 @@ def run(
     jgipath: Optional[str],
     bampaths: Optional[list[str]], 
     rpkmpath: Optional[str],
+    mask: Optional[str],
     mincontiglength: int,
     norefcheck: bool,
     noencode: bool,
@@ -361,6 +408,8 @@ def run(
         )
         return None
     log(f"\nTNF/PC and coabundances generated in {time_generating_input} minutes", logfile, 1)
+
+    composition, abundance = apply_mask(composition, abundance, mask)
 
     # Estimate the number of clusters
     if 'aaedec' in model_selection and nlatent_aae_y == None:
@@ -550,6 +599,7 @@ def main():
         help="Output tnfs and abundances only, do not encode or cluster [False]",
         action="store_true",
     )
+    inputos.add_argument('--mask', dest='mask', metavar="", help="contigs already clustered")
     
     # Model selection argument
     model_selection = parser.add_argument_group(title='Model selection', description=None)
@@ -676,6 +726,7 @@ def main():
     norefcheck: bool = args.norefcheck
     minfasta: Optional[int] = args.minfasta
     noencode: bool = args.noencode
+    mask: Optional[str] = args.mask
 
     nhiddens_aae: Optional[list[int]] = args.nhiddens_aae
     nlatent_aae_y: int = args.nlatent_aae_y
@@ -834,6 +885,7 @@ def main():
             jgi,
             bamfiles,
             rpkm,
+            mask=mask,
             mincontiglength=minlength,
             norefcheck=norefcheck,
             noencode=noencode,

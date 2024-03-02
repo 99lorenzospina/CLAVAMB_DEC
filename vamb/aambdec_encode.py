@@ -412,7 +412,7 @@ class AAEDEC(nn.Module):
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
         if logfile is not None:
-            print(f"\Pretraining in {time_generating_input} minutes", file=logfile)   
+            print(f"\nPretraining in {time_generating_input} minutes", file=logfile)   
         return
 
     def discriminator_loss(self, real_output, fake_output, device):
@@ -497,7 +497,7 @@ class AAEDEC(nn.Module):
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
         if logfile is not None:
-            print(f"\Pretraining dicriminator in {time_generating_input} minutes", file=logfile)   
+            print(f"\nPretraining dicriminator in {time_generating_input} minutes", file=logfile)   
         #Clustering phase
 
         if logfile is not None:
