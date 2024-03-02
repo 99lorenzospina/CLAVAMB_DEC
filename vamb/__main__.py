@@ -303,9 +303,9 @@ def apply_mask(composition, abundance, mask, logfile=None):
     del composition
 
     # Find indices of elements to remove
-    indices = [identifiers_copy.index(item) for item in data_list]
+    indices = [identifiers_copy[item] for item in data_list]
     # Remove elements from identifiers_copy and composition_metadata_lengths
-    identifiers_copy = [item for item in identifiers_copy if item not in data_list]
+    identifiers_copy = [identifiers_copy[i] for i in range(l) if i not in indices]
     lengths_copy = [lengths_copy[i] for i in range(l) if i not in indices]
     for i in indices:
         mask_copy[i] = False
@@ -409,7 +409,7 @@ def run(
         return None
     log(f"\nTNF/PC and coabundances generated in {time_generating_input} minutes", logfile, 1)
 
-    composition, abundance = apply_mask(composition, abundance, mask)
+    composition, abundance = apply_mask(composition, abundance, mask, logfile)
 
     # Estimate the number of clusters
     if 'aaedec' in model_selection and nlatent_aae_y == None:
