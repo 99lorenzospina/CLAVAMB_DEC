@@ -295,7 +295,6 @@ def apply_mask(composition, abundance, mask, logfile=None):
 
     mask_copy = composition.metadata.mask[:]
     minlength = composition.metadata.minlength
-    l = len(lengths_copy)
 
     # Find indices of elements to remove
     indices = [i for i, item in enumerate(composition.metadata.identifiers) if item in data_list]
