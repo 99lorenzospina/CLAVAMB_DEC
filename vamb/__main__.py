@@ -291,13 +291,20 @@ def apply_mask(composition, abundance, mask, logfile=None):
     # Remove the newline character from the last element
     data_list[-1] = data_list[-1].rstrip('\n')
     if logfile is not None:
-        print(f"\nApplying mask of {len(data_list)} contigs", file=logfile)
+        print(f"\nApplying mask of {len(data_list)} contigs over {len(composition.metadata.identifiers)} contigs", file=logfile)
 
     mask_copy = composition.metadata.mask[:]
     minlength = composition.metadata.minlength
 
+    # Find indices to delete from composition_metadata_identifiers
+    indices = np.where(np.isin(composition.metadata.identifiers, data_list))[0]
+
+    # Print elements in data_list not present in composition_metadata_identifiers
+    not_found_elements = set(data_list) - set(composition.metadata.identifiers)
+    print("Elements not found in composition_metadata_identifiers:", list(not_found_elements))
+
     # Find indices of elements to remove
-    indices = [i for i, item in enumerate(composition.metadata.identifiers) if item in data_list]
+    #indices = [i for i, item in enumerate(composition.metadata.identifiers) if item in data_list]
     # Remove elements from identifiers_copy and composition_metadata_lengths
     identifiers_copy = np.delete(composition.metadata.identifiers, indices)
     lengths_copy = np.delete(composition.metadata.lengths, indices)
