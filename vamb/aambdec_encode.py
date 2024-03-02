@@ -523,7 +523,7 @@ class AAEDEC(nn.Module):
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
         kmeans = KMeans(n_clusters=self.y_len, n_init=20)
-        y_pred = kmeans.fit_predict(encoded.cpu().numpy())        
+        y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())        
         y_pred_old = y_pred
         self.cluster_layer.data = torch.Tensor(kmeans.cluster_centers_).to(device)
         self.optimizer_D.param_groups[0]['lr'] = lrate
