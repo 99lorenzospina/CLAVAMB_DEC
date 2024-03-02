@@ -240,13 +240,13 @@ class AAEDEC(nn.Module):
 
         torch.save(state, filehandle)
 
-    def forward(self, depths_in, tnfs_in):
+    def forward(self, depths_in, tnfs_in=None):
         mu = self._encode(depths_in, tnfs_in)
         depths_out, tnfs_out = self._decode(mu)
 
         return mu, depths_out, tnfs_out
     
-    def get_q(self, depths_in, tnfs_in):
+    def get_q(self, depths_in, tnfs_in=None):
         mu, depths_out, tnfs_out = self(depths_in, tnfs_in)
         # cluster
         q = 1.0 / (1.0 + torch.sum(
@@ -290,7 +290,8 @@ class AAEDEC(nn.Module):
             self.optimizer_D = torch.optim.Adam(dec_params, lr=lr)
             self.optimizer_C = torch.optim.Adam(cri_params, lr=cri_lr)
 
-        self.train()
+        self.train()        
+        begintime = time.time()/60
         for iter in range(max_iter):
             time_epoch_0 = time.time()
             (
@@ -408,6 +409,10 @@ class AAEDEC(nn.Module):
                     ), file=logfile)
 
                 logfile.flush()
+        timepoint_gernerate_input=time.time()/60
+        time_generating_input= round(timepoint_gernerate_input-begintime,2)   
+        if logfile is not None:
+            print(f"\Pretraining in {time_generating_input} minutes", file=logfile)   
         return
 
     def discriminator_loss(self, real_output, fake_output, device):
@@ -448,6 +453,8 @@ class AAEDEC(nn.Module):
         self.optimizer_D.param_groups[0]['lr'] = self.dis_lr
         self.optimizer_clusters.param_groups[0]['lr'] = lrate
 
+        
+        begintime = time.time()/60
         for i in range(max_iter_dis):
             G_loss = 0
             time_epoch_0 = time.time()
@@ -487,7 +494,10 @@ class AAEDEC(nn.Module):
                     ), file=logfile)
 
                 logfile.flush()
-
+        timepoint_gernerate_input=time.time()/60
+        time_generating_input= round(timepoint_gernerate_input-begintime,2)   
+        if logfile is not None:
+            print(f"\Pretraining dicriminator in {time_generating_input} minutes", file=logfile)   
         #Clustering phase
 
         if logfile is not None:
@@ -516,19 +526,26 @@ class AAEDEC(nn.Module):
                                     num_workers=dataloader.num_workers,
                                     pin_memory=dataloader.pin_memory)
         
-        data = torch.cat((torch.tensor(depthstensor, dtype = torch.float), torch.tensor(tnftensor, dtype = torch.float)), dim=1).to(device)
+        data = torch.cat((depthstensor.clone().detach().to(torch.float), tnftensor.clone().detach().to(torch.float)), dim=1).to(device)
         encoded = self._encode(data)
         '''
         initial_centers = kmeans_plusplus_initializer(encoded, self.y_len).initialize()
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
+        begintime = time.time()/60
         kmeans = KMeans(n_clusters=self.y_len, n_init=20)
-        y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())        
+        y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())
+        timepoint_gernerate_input=time.time()/60
+        time_generating_input= round(timepoint_gernerate_input-begintime,2)   
+        if logfile is not None:
+            print(f"\nCentroids initialized in {time_generating_input} minutes", file=logfile)     
+        
         y_pred_old = y_pred
         self.cluster_layer.data = torch.Tensor(kmeans.cluster_centers_).to(device)
         self.optimizer_D.param_groups[0]['lr'] = lrate
 
         self.train()
+        begintime = time.time()/60
         for epoch in range(max_iter):
             time_epoch_0 = time.time()
             (D_loss,
@@ -593,6 +610,10 @@ class AAEDEC(nn.Module):
                     ), file=logfile)
 
                 logfile.flush()
+        timepoint_gernerate_input=time.time()/60
+        time_generating_input= round(timepoint_gernerate_input-begintime,2)   
+        if logfile is not None:
+            print(f"\Training and clustering in {time_generating_input} minutes", file=logfile)   
         if modelfile is not None:
             try:
                 self.save(modelfile)
