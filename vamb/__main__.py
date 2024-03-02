@@ -293,25 +293,21 @@ def apply_mask(composition, abundance, mask, logfile=None):
     if logfile is not None:
         print(f"\nApplying mask of {len(data_list)} contigs", file=logfile)
 
-    # Create a copy of composition.metadata.identifiers and composition.metadata.lengths
-    identifiers_copy = composition.metadata.identifiers[:]
-    lengths_copy = composition.metadata.lengths[:]
     mask_copy = composition.metadata.mask[:]
-    matrix_copy = composition.matrix[:]
     minlength = composition.metadata.minlength
     l = len(lengths_copy)
-    del composition
 
     # Find indices of elements to remove
-    indices = [identifiers_copy[item] for item in data_list]
+    indices = [i for i, item in enumerate(composition.metadata.identifiers) if item in data_list]
     # Remove elements from identifiers_copy and composition_metadata_lengths
-    identifiers_copy = [identifiers_copy[i] for i in range(l) if i not in indices]
-    lengths_copy = [lengths_copy[i] for i in range(l) if i not in indices]
+    identifiers_copy = np.delete(composition.metadata.identifiers, indices)
+    lengths_copy = np.delete(composition.metadata.lengths, indices)
     for i in indices:
         mask_copy[i] = False
-    matrix_copy = np.delete(matrix_copy, indices, axis=0)
+    matrix_copy = np.delete(composition.matrix, indices, axis=0)
 
     abundance = np.delete(abundance, indices, axis=0)
+    del composition
     composition = vamb.parsecontigs.Composition(vamb.parsecontigs.CompositionMetaData(
                     identifiers_copy, lengths_copy, mask_copy, minlength), matrix_copy)
 
