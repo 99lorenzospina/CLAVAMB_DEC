@@ -517,7 +517,7 @@ class AAEDEC(nn.Module):
                                     pin_memory=dataloader.pin_memory)
         
         data = torch.cat((torch.tensor(depthstensor, dtype = torch.float), torch.tensor(tnftensor, dtype = torch.float)), dim=1).to(device)
-        encoded = self._encode(data, [])
+        encoded = self._encode(data)
         '''
         initial_centers = kmeans_plusplus_initializer(encoded, self.y_len).initialize()
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
