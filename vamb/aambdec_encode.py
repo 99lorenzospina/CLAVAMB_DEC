@@ -576,7 +576,7 @@ class AAEDEC(nn.Module):
                 if epoch > 0 and delta_label < tol:
                     print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
-            for _, (depths_in, tnfs_in, idx) in data_loader:
+            for depths_in, tnfs_in, idx in data_loader:
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
