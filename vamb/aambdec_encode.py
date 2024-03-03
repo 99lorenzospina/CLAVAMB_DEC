@@ -146,13 +146,13 @@ class AAEDEC(nn.Module):
         return self.critic(c)
 
     ## Encoder
-    def _encode(self, depths, tnfs=None):
+    def _encode(self, depths, tnfs=None, tocpu = False):
         _input = None
         if tnfs != None:
             _input = torch.cat((depths, tnfs), 1)
         else:
             _input = depths
-        if self.usecuda:
+        if self.usecuda and not tocpu:
             _input = _input.cuda()
         x = self.encoder(_input)
 
@@ -242,8 +242,8 @@ class AAEDEC(nn.Module):
 
         torch.save(state, filehandle)
 
-    def forward(self, depths_in, tnfs_in=None):
-        mu = self._encode(depths_in, tnfs_in)
+    def forward(self, depths_in, tnfs_in=None, tocpu=False):
+        mu = self._encode(depths_in, tnfs_in, tocpu)
         depths_out, tnfs_out = self._decode(mu)
 
         return mu, depths_out, tnfs_out
@@ -251,7 +251,9 @@ class AAEDEC(nn.Module):
     def get_q(self, depths_in, tnfs_in=None, tocpu=False):
         if tocpu and self.usecuda:
             self.cpu()
-        mu, depths_out, tnfs_out = self(depths_in, tnfs_in)
+            depths_in.to("cpu")
+            tnfs_in.to("cpu")
+        mu, depths_out, tnfs_out = self(depths_in, tnfs_in, tocpu)
         # cluster
         q = 1.0 / (1.0 + torch.sum(
             torch.pow(mu.unsqueeze(1) - self.cluster_layer, 2), 2) / self.alpha)
@@ -559,6 +561,7 @@ class AAEDEC(nn.Module):
              G_loss,) = (0,0,0)
             if epoch%targ_iter == 0:
                 #Compute q and p
+                self.cpu()
                 tmp_q,_,_,_ = self.get_q(data.cpu(), tocpu=True)
                 tmp_q = tmp_q.data
                 p = self.student_t_distribution(tmp_q)
