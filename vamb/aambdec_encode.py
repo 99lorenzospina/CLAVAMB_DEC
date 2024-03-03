@@ -137,10 +137,10 @@ class AAEDEC(nn.Module):
             self.optimizer_G = optimizer_G
             self.optimizer_C = optimizer_C
 
-        self.cuda = False
+        self.usecuda = False
         if _cuda:
             self.cuda()
-            self.cuda = True
+            self.usecuda = True
 
     def _critic(self, c):
         return self.critic(c)
@@ -249,7 +249,7 @@ class AAEDEC(nn.Module):
         return mu, depths_out, tnfs_out
     
     def get_q(self, depths_in, tnfs_in=None, tocpu=False):
-        if tocpu and self.cuda:
+        if tocpu and self.usecuda:
             self.cpu()
         mu, depths_out, tnfs_out = self(depths_in, tnfs_in)
         # cluster
@@ -257,7 +257,7 @@ class AAEDEC(nn.Module):
             torch.pow(mu.unsqueeze(1) - self.cluster_layer, 2), 2) / self.alpha)
         q = q.pow((self.alpha + 1.0) / 2.0)
         q = (q.t() / torch.sum(q, 1)).t()
-        if tocpu and self.cuda:
+        if tocpu and self.usecuda:
             self.cuda()
         return q, mu, depths_out, tnfs_out
 
