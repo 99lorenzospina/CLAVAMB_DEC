@@ -137,8 +137,10 @@ class AAEDEC(nn.Module):
             self.optimizer_G = optimizer_G
             self.optimizer_C = optimizer_C
 
+        self.cuda = False
         if _cuda:
             self.cuda()
+            self.cuda = True
 
     def _critic(self, c):
         return self.critic(c)
@@ -246,13 +248,17 @@ class AAEDEC(nn.Module):
 
         return mu, depths_out, tnfs_out
     
-    def get_q(self, depths_in, tnfs_in=None):
+    def get_q(self, depths_in, tnfs_in=None, tocpu=False):
+        if tocpu and self.cuda:
+            self.cpu()
         mu, depths_out, tnfs_out = self(depths_in, tnfs_in)
         # cluster
         q = 1.0 / (1.0 + torch.sum(
             torch.pow(mu.unsqueeze(1) - self.cluster_layer, 2), 2) / self.alpha)
         q = q.pow((self.alpha + 1.0) / 2.0)
         q = (q.t() / torch.sum(q, 1)).t()
+        if tocpu and self.cuda:
+            self.cuda()
         return q, mu, depths_out, tnfs_out
 
     def pretrain(self, dataloader, max_iter, logfile):
@@ -553,7 +559,7 @@ class AAEDEC(nn.Module):
              G_loss,) = (0,0,0)
             if epoch%targ_iter == 0:
                 #Compute q and p
-                tmp_q,_,_,_ = self.get_q(data)
+                tmp_q,_,_,_ = self.get_q(data.cpu(), tocpu=True)
                 tmp_q = tmp_q.data
                 p = self.student_t_distribution(tmp_q)
                 
@@ -562,7 +568,7 @@ class AAEDEC(nn.Module):
                 delta_label = np.sum(y_pred != y_pred_old).astype(
                     np.float32) / y_pred.shape[0]
                 y_pred_old = y_pred
-
+                data.to(device)
                 if epoch > 0 and delta_label < tol:
                     print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
