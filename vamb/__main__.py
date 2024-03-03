@@ -303,8 +303,6 @@ def apply_mask(composition, abundance, mask, logfile=None):
     not_found_elements = set(data_list) - set(composition.metadata.identifiers)
     print("Elements not found in composition_metadata_identifiers:", list(not_found_elements))
 
-    # Find indices of elements to remove
-    #indices = [i for i, item in enumerate(composition.metadata.identifiers) if item in data_list]
     # Remove elements from identifiers_copy and composition_metadata_lengths
     identifiers_copy = np.delete(composition.metadata.identifiers, indices)
     lengths_copy = np.delete(composition.metadata.lengths, indices)

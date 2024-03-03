@@ -252,7 +252,8 @@ class AAEDEC(nn.Module):
         if tocpu and self.usecuda:
             self.cpu()
             depths_in.to("cpu")
-            tnfs_in.to("cpu")
+            if tnfs_in != None:
+                tnfs_in.to("cpu")
         mu, depths_out, tnfs_out = self(depths_in, tnfs_in, tocpu)
         # cluster
         q = 1.0 / (1.0 + torch.sum(
@@ -505,7 +506,7 @@ class AAEDEC(nn.Module):
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
         if logfile is not None:
-            print(f"\nPretraining dicriminator in {time_generating_input} minutes", file=logfile)   
+            print(f"\nPretraining discriminator and initializing clusters in {time_generating_input} minutes", file=logfile)   
         #Clustering phase
 
         if logfile is not None:
