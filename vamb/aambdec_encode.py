@@ -249,7 +249,7 @@ class AAEDEC(nn.Module):
         return mu, depths_out, tnfs_out
     
     def get_q(self, depths_in, tnfs_in=None, tocpu=False):
-        if tocpu and self.usecuda:
+        if tocpu and self.usecuda:  #should be in cuda, but it's unfeasible
             self.cpu()
             depths_in.to("cpu")
             if tnfs_in != None:
@@ -542,7 +542,7 @@ class AAEDEC(nn.Module):
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
         begintime = time.time()/60
-        kmeans = KMeans(n_clusters=self.y_len, n_init=20)
+        kmeans = KMeans(n_clusters=self.y_len, n_init=1) #n_init = 20
         y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
@@ -577,17 +577,17 @@ class AAEDEC(nn.Module):
                     print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
             for depths_in, tnfs_in, idx in data_loader:
-                '''
+                
                 if self.usecuda:
                     depths_in = depths_in.cuda()
                     tnfs_in = tnfs_in.cuda()
-                    p = p.cuda()
-                '''
-                q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in, True)   #is usecuda, self is back on cuda()!
-                self.cpu()
+                    self.cuda()
+                    #note: p.cuda() is not feasible
+                
+                q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
-                loss_cls = fake_loss + F.kl_div(q.log(), p[idx])
+                loss_cls = fake_loss + F.kl_div(q.cpu().log(), p[idx])
                 D_loss += loss_d.item()
                 Cls_loss += loss_cls.item()
                 G_loss += loss_g.item()
