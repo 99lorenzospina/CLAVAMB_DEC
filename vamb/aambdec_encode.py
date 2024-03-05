@@ -583,6 +583,9 @@ class AAEDEC(nn.Module):
                     tnfs_in = tnfs_in.cuda()
                     self.cuda()
                     #note: p.cuda() is not feasible
+                depths_in.requires_grad = True
+                tnfs_in.requires_grad = True
+                self.cluster_layer.requires_grad = True
                 
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
@@ -597,7 +600,7 @@ class AAEDEC(nn.Module):
                     self.optimizer_D.step()                             
                 else:
                     self.optimizer_E.zero_grad()
-                    self.cluster_layer.zero_grad()
+                    self.cluster_layer.grad.zero_()
                     #self.optimizer_clusters.zero_grad()
                     loss_cls.backward()
                     self.optimizer_E.step() 
