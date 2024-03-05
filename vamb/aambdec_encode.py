@@ -586,34 +586,41 @@ class AAEDEC(nn.Module):
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
                 self.cluster_layer.requires_grad = True
-                
-                q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
-                loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
-                loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
-                loss_cls = fake_loss + F.kl_div(q.cpu().log(), p[idx])
-                D_loss += loss_d.item()
-                Cls_loss += loss_cls.item()
-                G_loss += loss_g.item()
+
                 if (epoch % aux_iter <= (aux_iter/2)):
                     self.optimizer_D.zero_grad()
+                    q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
+                    loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
                     loss_d.backward()
-                    self.optimizer_D.step()                             
+                    self.optimizer_D.step()
+                    D_loss += loss_d.item()                             
                 else:
+                    self.optimizer_D.zero_grad()
+                    q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
+                    loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
+                    loss_d.backward()
+                    self.optimizer_D.step() 
+                    D_loss += loss_d.item()  
+
                     self.optimizer_E.zero_grad()
                     self.cluster_layer.grad.zero_()
                     #self.optimizer_clusters.zero_grad()
+                    q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
+                    _, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
+                    loss_cls = fake_loss + F.kl_div(q.cpu().log(), p[idx])
                     loss_cls.backward()
                     self.optimizer_E.step() 
                     #self.optimizer_clusters.step()
                     with torch.no_grad():
-                        # Update centroids using gradient descent
-                        self.cluster_layer.data -= lrate * self.cluster_layer.grad
-                    self.optimizer_D.zero_grad()
-                    loss_d.backward()
-                    self.optimizer_D.step()         
+                        self.cluster_layer.data -= lrate * self.cluster_layer.grad        
+                    Cls_loss += loss_cls.item()
+
                     self.optimizer_G.zero_grad()
+                    loss_g, _ = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                     loss_g.backward()
                     self.optimizer_G.step()
+                    G_loss += loss_g.item()
+
                 time_epoch_1 = time.time()
                 time_e = np.round((time_epoch_1 - time_epoch_0) / 60, 3)
             
