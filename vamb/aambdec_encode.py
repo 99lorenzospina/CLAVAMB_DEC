@@ -577,10 +577,13 @@ class AAEDEC(nn.Module):
                     print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
                     break   #cannot improve anymore
             for depths_in, tnfs_in, idx in data_loader:
+                '''
                 if self.usecuda:
                     depths_in = depths_in.cuda()
                     tnfs_in = tnfs_in.cuda()
                     p = p.cuda()
+                '''
+                self.cpu()
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
