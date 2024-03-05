@@ -584,6 +584,8 @@ class AAEDEC(nn.Module):
                     p = p.cuda()
                 '''
                 self.cpu()
+                depths_in = depths_in.to("cpu")
+                tnfs_in = tnfs_in.to("cpu")
                 q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                 loss_g, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                 loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
