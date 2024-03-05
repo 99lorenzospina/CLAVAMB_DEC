@@ -597,7 +597,7 @@ class AAEDEC(nn.Module):
                     self.optimizer_D.step()                             
                 else:
                     self.optimizer_E.zero_grad()
-                    self.cluster_layer.grad.zero_grad()
+                    self.cluster_layer.zero_grad()
                     #self.optimizer_clusters.zero_grad()
                     loss_cls.backward()
                     self.optimizer_E.step() 
