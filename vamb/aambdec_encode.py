@@ -646,7 +646,7 @@ class AAEDEC(nn.Module):
                 self.save(modelfile)
             except:
                 pass
-        print("y_pred returned at first:", y_pred)
+        print("y_pred returned at first has len:", y_pred.size)
         print("it has maximum value: ", max(y_pred))
         return y_pred   #return the clustering
 
@@ -667,6 +667,7 @@ class AAEDEC(nn.Module):
         clust_y_dict: dict[str, set[str]] = dict()
         with torch.no_grad():
                 for _y in y_pred:
+                    print(_y)
                     contig_name = contignames[index_contigname]
                     contig_cluster = np.argmax(_y) + 1
                     contig_cluster_str = str(contig_cluster)
