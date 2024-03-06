@@ -294,10 +294,6 @@ def apply_mask(composition, abundance, mask, logfile=None):
 
     indices = np.where(np.isin(composition.metadata.identifiers, data_list))[0]
 
-    # Print elements in data_list not present in composition_metadata_identifiers
-    not_found_elements = set(data_list) - set(composition.metadata.identifiers)
-    print("Elements not found in composition_metadata_identifiers:", list(not_found_elements))
-
     # Remove elements from identifiers_copy and composition_metadata_lengths
     identifiers_copy = np.delete(composition.metadata.identifiers, indices)
     lengths_copy = np.delete(composition.metadata.lengths, indices)
@@ -446,7 +442,7 @@ def run(
         )
         fin_train_aae=time.time()/60
         time_training_aae=round(fin_train_aae-begin_train_aae,2)
-        log(f"\nAAE trained in {time_training_aae}", logfile, 1)
+        log(f"\nAAE trained in {time_training_aae} minutes", logfile, 1)
      
     # Free up memory
     comp_metadata = composition.metadata

@@ -646,7 +646,8 @@ class AAEDEC(nn.Module):
                 self.save(modelfile)
             except:
                 pass
-        print(y_pred)
+        print("y_pred returned at first:", y_pred)
+        print("it has maximum value: ", max(y_pred))
         return y_pred   #return the clustering
 
     def get_dict(
@@ -677,5 +678,5 @@ class AAEDEC(nn.Module):
 
                     index_contigname += 1
                 del y_pred
-
+        print("With get_dict I return: ", clust_y_dict)
         return clust_y_dict
