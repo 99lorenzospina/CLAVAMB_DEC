@@ -685,7 +685,7 @@ def run(
         )
         fin_train_aae=time.time()/60
         time_training_aae=round(fin_train_aae-begin_train_aae,2)
-        log(f"\nAAE trained in {time_training_aae}", logfile, 1)
+        log(f"\nAAE trained in {time_training_aae} minutes", logfile, 1)
      
     # Free up memory
     comp_metadata = composition.metadata
@@ -758,7 +758,7 @@ def run(
         )
         fin_cluster_latent_z=time.time()/60
         time_clustering_latent_z=round(fin_cluster_latent_z-begin_cluster_latent_z,2)
-        log(f"\nAAE z latent clustered in {time_clustering_latent_z}", logfile, 1)
+        log(f"\nAAE z latent clustered in {time_clustering_latent_z} minutes", logfile, 1)
 
         del latent_z
 
