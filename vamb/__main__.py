@@ -653,7 +653,7 @@ def run(
         )
         fin_train_vae=time.time()/60
         time_training_vae=round(fin_train_vae-begin_train_vae,2)
-        log(f"\nVAE trained in {time_training_vae}", logfile, 1)
+        log(f"\nVAE trained in {time_training_vae} minutes", logfile, 1)
        
     if 'aae' in model_selection:
         begin_train_aae = time.time()/60
@@ -716,7 +716,7 @@ def run(
         )
         fin_cluster_latent=time.time()/60
         time_clustering_latent=round(fin_cluster_latent-begin_cluster_latent,2)
-        log(f"\nVAE latent clustered in {time_clustering_latent}", logfile, 1)
+        log(f"\nVAE latent clustered in {time_clustering_latent} minutes", logfile, 1)
 
         del latent
 
