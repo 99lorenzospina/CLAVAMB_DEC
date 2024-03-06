@@ -29,7 +29,7 @@ from vamb.global_variables import global_separator
 _ncpu = os.cpu_count()
 DEFAULT_THREADS = 8 if _ncpu is None else min(_ncpu, 8)
 
-LOAD_MOD = True
+LOAD_MOD = False
 
 # These MUST be set before importing numpy
 # I know this is a shitty hack, see https://github.com/numpy/numpy/issues/11826
