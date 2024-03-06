@@ -646,6 +646,7 @@ class AAEDEC(nn.Module):
                 self.save(modelfile)
             except:
                 pass
+        print(y_pred)
         return y_pred   #return the clustering
 
     def get_dict(
