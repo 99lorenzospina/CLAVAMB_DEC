@@ -585,7 +585,7 @@ class AAEDEC(nn.Module):
                     #note: p.cuda() is not feasible
                 depths_in.requires_grad = True
                 tnfs_in.requires_grad = True
-                self.cluster_layer.requires_grad = True
+                #self.cluster_layer.requires_grad = True
 
                 if (epoch % aux_iter <= (aux_iter/2)):
                     self.optimizer_D.zero_grad()
@@ -603,16 +603,16 @@ class AAEDEC(nn.Module):
                     D_loss += loss_d.item()  
 
                     self.optimizer_E.zero_grad()
-                    self.cluster_layer.grad.zero_()
-                    #self.optimizer_clusters.zero_grad()
+                    #self.cluster_layer.grad.zero_()
+                    self.optimizer_clusters.zero_grad()
                     q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                     _, fake_loss = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                     loss_cls = fake_loss + F.kl_div(q.cpu().log(), p[idx])
                     loss_cls.backward()
                     self.optimizer_E.step() 
-                    #self.optimizer_clusters.step()
-                    with torch.no_grad():
-                        self.cluster_layer.data -= lrate * self.cluster_layer.grad        
+                    self.optimizer_clusters.step()
+                    #with torch.no_grad():
+                    #    self.cluster_layer.data -= lrate * self.cluster_layer.grad        
                     Cls_loss += loss_cls.item()
 
                     self.optimizer_G.zero_grad()
