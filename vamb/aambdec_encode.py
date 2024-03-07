@@ -542,7 +542,7 @@ class AAEDEC(nn.Module):
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
         begintime = time.time()/60
-        kmeans = KMeans(n_clusters=self.y_len, n_init=20)
+        kmeans = KMeans(n_clusters=self.y_len, n_init=1) #1
         y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
