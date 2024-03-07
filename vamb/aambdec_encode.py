@@ -542,7 +542,7 @@ class AAEDEC(nn.Module):
         y_pred = kmeans(encoded, initial_centers, ccore=False).process().get_clusters()
         '''
         begintime = time.time()/60
-        kmeans = KMeans(n_clusters=self.y_len, n_init=1) #1
+        kmeans = KMeans(n_clusters=self.y_len, n_init=20)
         y_pred = kmeans.fit_predict(encoded.data.cpu().numpy())
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
@@ -640,7 +640,7 @@ class AAEDEC(nn.Module):
         timepoint_gernerate_input=time.time()/60
         time_generating_input= round(timepoint_gernerate_input-begintime,2)   
         if logfile is not None:
-            print(f"\Training and clustering in {time_generating_input} minutes", file=logfile)   
+            print(f"Training and clustering in {time_generating_input} minutes", file=logfile)   
         if modelfile is not None:
             try:
                 self.save(modelfile)
