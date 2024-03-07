@@ -574,7 +574,8 @@ class AAEDEC(nn.Module):
                 y_pred_old = y_pred
                 data.to(device)
                 if epoch > 0 and delta_label < tol:
-                    print('Reached tolerance threshold. Stopping training. Epoch is: ', epoch)
+                    if logfile is not None:
+                        print(f"\nReached tolerance threshold. Stopping training. Epoch is {epoch} ", file=logfile)
                     break   #cannot improve anymore
             for depths_in, tnfs_in, idx in data_loader:
                 
