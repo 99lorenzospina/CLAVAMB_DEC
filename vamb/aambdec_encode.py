@@ -617,6 +617,7 @@ class AAEDEC(nn.Module):
                     Cls_loss += loss_cls.item()
 
                     self.optimizer_G.zero_grad()
+                    q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)
                     loss_g, _ = self.discriminator_loss(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1), device)
                     loss_g.backward()
                     self.optimizer_G.step()
