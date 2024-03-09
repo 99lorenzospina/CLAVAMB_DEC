@@ -623,6 +623,7 @@ def run(
         time_generating_input= round(timepoint_gernerate_input-begintime,2)
         log(f"\nCluster estimated in {time_generating_input} minutes", logfile, 1)
         log(f"\nEstimated {nlatent_aae_y} clusters", logfile, 1)
+        return None
 
     #Training phase
     if 'vae' in model_selection:
