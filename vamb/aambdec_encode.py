@@ -588,7 +588,7 @@ class AAEDEC(nn.Module):
                 tnfs_in.requires_grad = True
                 #self.cluster_layer.requires_grad = True
 
-                if (epoch % aux_iter <= (aux_iter/2)):
+                if (epoch % aux_iter < (aux_iter/3)):
                     self.optimizer_D.zero_grad()
                     q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
                     loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
@@ -629,7 +629,7 @@ class AAEDEC(nn.Module):
             total_batches_inthis_epoch = len(data_loader)
             if logfile is not None:
                 print(
-                    "\tEpoch: {}\t Loss Enc: {:.6f}\t Loss Dec: {:.6f}\t Discriminator. loss: {:.4f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
+                    "\tEpoch: {}\t Loss Enc: {:.6f}\t Loss Dec: {:.6f}\t Discriminator loss: {:.4f}\t Batchsize: {}\t Epoch time(min): {: .4}".format(
                           epoch + 1,
                           Cls_loss / total_batches_inthis_epoch,
                           D_loss / total_batches_inthis_epoch,

@@ -400,7 +400,8 @@ def run(
         return None
     log(f"\nTNF/PC and coabundances generated in {time_generating_input} minutes", logfile, 1)
 
-    composition, abundance = apply_mask(composition, abundance, mask, logfile)
+    if mask is not None:
+        composition, abundance = apply_mask(composition, abundance, mask, logfile)
 
     # Estimate the number of clusters
     if 'aaedec' in model_selection and nlatent_aae_y == None:
