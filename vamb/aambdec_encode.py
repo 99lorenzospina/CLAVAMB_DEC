@@ -589,8 +589,8 @@ class AAEDEC(nn.Module):
                 tnfs_in.requires_grad = True
                 #self.cluster_layer.requires_grad = True
 
-                #if (epoch % aux_iter < (aux_iter/3)):
-                if False:
+                if (epoch % aux_iter <= (aux_iter/2):
+                #if False:
                     self.optimizer_D.zero_grad()
                     q, _, depths_out, tnfs_out = self.get_q(depths_in, tnfs_in)   #if usecuda, self is back on cuda()!
                     loss_d = torch.nn.MSELoss()(torch.cat((depths_in, tnfs_in), dim=1), torch.cat((depths_out, tnfs_out), dim=1))
