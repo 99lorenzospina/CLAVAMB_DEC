@@ -1,16 +1,14 @@
-Job ID: 1391230: estimate k for airways with TNF+Abundance
-setting nclusters as 3247
-Cluster estimated in 94.79
+Job ID: 1459169 estimate k for airways with tnf+Abundances
 Cluster: cluster_dei
 User/Group: spinaloren/studenti
 State: COMPLETED (exit code 0)
-Nodes: 5
-Cores per node: 1
-CPU Utilized: 11:19:54
-CPU Efficiency: 87.87% of 12:53:44 core-walltime
-Job Wall-clock time: 01:36:43
-Memory Utilized: 13.26 GB (estimated maximum)
-Memory Efficiency: 84.89% of 15.62 GB (1.95 GB/core)
+Cores: 1
+CPU Utilized: 01:31:38
+CPU Efficiency: 99.49% of 01:32:06 core-walltime
+Job Wall-clock time: 01:32:06
+Memory Utilized: 1.68 GB
+Memory Efficiency: 12.90% of 13.00 GB
+
 
 setting nclusters as 2973
 Job ID: 1393374 estimate k for airways with pc+Abundance
@@ -112,7 +110,8 @@ Memory Efficiency: 5.46% of 13.00 GB
 setting nclusters as 1311 estimate k for urog with pc+Abundance
 Job ID: 1393700
 Cluster: cluster_dei
-User/Group: spinaloren/studenti
+User/Group: spsetting nclusters as 16594 estimate k for metahit with pc+Abundance
+inaloren/studenti
 State: COMPLETED (exit code 0)
 Cores: 1
 CPU Utilized: 00:06:17
@@ -120,19 +119,6 @@ CPU Efficiency: 98.18% of 00:06:24 core-walltime
 Job Wall-clock time: 00:06:24
 Memory Utilized: 518.02 MB
 Memory Efficiency: 3.89% of 13.00 GB
-
-setting nclusters as 16594 estimate k for metahit with pc+Abundance
-Job ID: 1393768
-Cluster: cluster_dei
-User/Group: spinaloren/studenti
-State: OUT_OF_MEMORY (exit code 0)
-Nodes: 1
-Cores per node: 5
-CPU Utilized: 2-16:44:31
-CPU Efficiency: 60.11% of 4-11:41:55 core-walltime
-Job Wall-clock time: 21:32:23
-Memory Utilized: 17.65 GB (estimated maximum)
-Memory Efficiency: 135.78% of 13.00 GB (13.00 GB/node)
 
 setting nclusters as 15906 for metahit pc+abundance
 Job ID: 1394776
@@ -146,7 +132,7 @@ Job Wall-clock time: 18:13:48
 Memory Utilized: 3.52 GB
 Memory Efficiency: 27.07% of 13.00 GB
 
-setting nclusters as 18324 for metahit tnf+pcabundance
+setting nclusters as 18324 for metahit tnf+abundance
 Job ID: 1394777
 Cluster: cluster_dei
 User/Group: spinaloren/studenti
