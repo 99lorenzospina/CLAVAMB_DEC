@@ -220,6 +220,8 @@ def traindec(
     
     print("", file=logfile)
     log("Creating clusters", logfile, 1)
+    print(max(y_pred))
+    print(y_pred.size)
     clusters_y_dict = aaedec.get_dict(contignames, y_pred)
     del aaedec  # Needed to free "latent" array's memory references?
 
