@@ -224,7 +224,7 @@ def traindec(
     print(y_pred.size)
     clusters_y_dict = aaedec.get_dict(contignames, y_pred)
     del aaedec  # Needed to free "latent" array's memory references?
-
+    print(len(clusters_y_dict))
     elapsed = round(time.time()/60 - begintime, 2)
     log(f"Trained AAE and clustering in {elapsed} minutes", logfile, 1)
 
