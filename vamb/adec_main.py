@@ -647,9 +647,9 @@ def main():
     aaetrainos.add_argument('--tol_aae', dest='tol',  metavar='',type=float,
                         default=1e-6, help='tollerance threshold [0.0001%]')
     aaetrainos.add_argument('--more_decoder', dest='md',  action ='store_true',
-                        default=False, help='tollerance threshold [0.0001%]')
+                        default=False, help='further train decoder')
     aaetrainos.add_argument('--optimizer_clusters', dest='oc',  action ='store_true',
-                        default=False, help='tollerance threshold [0.0001%]')
+                        default=False, help='utilizer optimizer for clusters')
     aaetrainos.add_argument(
         "-t",
         dest="batchsize",
