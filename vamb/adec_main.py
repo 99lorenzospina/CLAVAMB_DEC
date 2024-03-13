@@ -187,7 +187,9 @@ def traindec(
     batchsize: int,
     lrate: float,
     logfile: IO[str],
-    contignames: np.ndarray
+    contignames: np.ndarray,
+    md: bool,
+    oc: bool
 ) -> tuple[np.ndarray, np.ndarray, dict()]:
 
     begintime = time.time()/60
@@ -211,7 +213,7 @@ def traindec(
         log("Created AAE", logfile, 1)
         modelpath = os.path.join(outdir, 'aaedec_model.pt')
         aaedec.pretrain(dataloader, max_iter_pretrain, logfile)
-        y_pred = aaedec.trainmodel(dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=modelpath, logfile=logfile)
+        y_pred = aaedec.trainmodel(dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=modelpath, logfile=logfile, more_train_decoder=md, utilize_clusters_optimizer=oc)
     else:   #NOT WORKING: I should save also former y_preds and start retraining and also updating y_pred, dunno wether to do it
         modelpath = os.path.join(outdir, 'aaedec_model.pt')
         log("Loaded AAE", logfile, 1)
@@ -349,6 +351,8 @@ def run(
     model_selection: str,
     use_pc: bool,
     use_tnf: bool,
+    md: bool,
+    oc: bool,
     logfile: IO[str]
 ):
 
@@ -440,6 +444,8 @@ def run(
             lrate,
             logfile,
             composition.metadata.identifiers,
+            md,
+            oc
         )
         fin_train_aae=time.time()/60
         time_training_aae=round(fin_train_aae-begin_train_aae,2)
@@ -640,6 +646,10 @@ def main():
                         default=2000, help='maximum number of iterations in critic training [2000]')
     aaetrainos.add_argument('--tol_aae', dest='tol',  metavar='',type=float,
                         default=1e-6, help='tollerance threshold [0.0001%]')
+    aaetrainos.add_argument('--more_decoder', dest='md',  action ='store_true',
+                        default=False, help='tollerance threshold [0.0001%]')
+    aaetrainos.add_argument('--optimizer_clusters', dest='oc',  action ='store_true',
+                        default=False, help='tollerance threshold [0.0001%]')
     aaetrainos.add_argument(
         "-t",
         dest="batchsize",
@@ -905,6 +915,8 @@ def main():
             model_selection=args.model,
             use_pc = args.use_pc,
             use_tnf = use_tnf,
+            md = args.md,
+            oc = args.oc,
             logfile=logfile,
         )
 
