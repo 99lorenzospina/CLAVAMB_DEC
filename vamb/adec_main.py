@@ -212,6 +212,7 @@ def traindec(
         aaedec = vamb.aambdec_encode.AAEDEC(ntnf=int(tnfs.shape[1]), nsamples=nsamples, nhiddens=nhiddens, nlatent_y=nlatent_y, lr=lr, cri_lr=cri_lr, dis_lr=dis_lr, _cuda=cuda)
         log("Created AAE", logfile, 1)
         #modelpath = os.path.join(outdir, 'aaedec_model.pt')
+        modelpath = None
         aaedec.pretrain(dataloader, max_iter_pretrain, logfile)
         y_pred = aaedec.trainmodel(dataloader, max_iter, aux_iter, max_iter_dis, targ_iter, tol, lrate, modelfile=modelpath, logfile=logfile, more_train_decoder=md, utilize_clusters_optimizer=oc)
     else:   #NOT WORKING: I should save also former y_preds and start retraining and also updating y_pred, dunno wether to do it
