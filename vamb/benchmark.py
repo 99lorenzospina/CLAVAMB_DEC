@@ -351,6 +351,7 @@ class Binning:
     self.intersectionsof: {genome: {bin:_name: intersection}}
     self.breadth:         Total breadth of all bins
     self.counters:        List of (rec, prec) Counters of genomes for each taxonomic rank
+    self.cluster_dir:     Where to save the output files
     """
     _DEFAULTRECALLS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
     _DEFAULTPRECISIONS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
@@ -445,7 +446,6 @@ class Binning:
                 recall = tp / (tp + fn)
                 precision = tp / (tp + fp)
                 recprecof[genome.name][binname] = (recall, precision)
-
         return recprecof
 
     def _getcounts(self):
@@ -456,6 +456,16 @@ class Binning:
                 pk.dump(recprecof,f)
                 f.close()
         seen = self._getseen(recprecof)
+
+        import json
+        import os
+        json_file_path = os.path.join(self.cluster_dir, 'recprecof.json')
+        with open(json_file_path, 'w') as json_file:
+            json.dump(recprecof, json_file)
+        json_file_path = os.path.join(self.cluster_dir, 'taxmaps.json')
+        with open(json_file_path, 'w') as json_file:
+            json.dump(self.reference.taxmaps, json_file)
+        
         # Calculate counts for each taxonomic level
         for counter, taxmap in zip(counts, self.reference.taxmaps):
             self._accumulate(seen, counter)
@@ -464,14 +474,13 @@ class Binning:
                 newclade = taxmap[clade]
                 newseen[newclade] = newseen.get(newclade, 0) | v
             seen = newseen
-
         self._accumulate(seen, counts[-1])
-
+        
         return counts
 
     def __init__(self, contigsof, reference, recalls=_DEFAULTRECALLS,
               precisions=_DEFAULTPRECISIONS, checkpresence=True, disjoint=True,
-              binsplit_separator=None, minsize=None, mincontigs=None):
+              binsplit_separator=None, minsize=None, mincontigs=None, cluster_dir=None):
         # See class docstring for explanation of arguments
 
         # Checkpresence enforces that each contig in a bin is also in the reference,
@@ -498,8 +507,12 @@ class Binning:
                 intersectionsof[genome][bin_name] = intersection
         self.intersectionsof = intersectionsof
 
+        # Set output folder
+        self.cluster_dir = cluster_dir
+        
         # Set counts
         self.counters = self._getcounts()
+
 
     def _parse_bins(self, contigsof, checkpresence, disjoint, binsplit_separator, minsize, mincontigs):
         "Fills self.binof, self.contigsof and self.breadthof during instantiation"
@@ -555,7 +568,7 @@ class Binning:
     @classmethod
     def from_file(cls, filehandle, reference, recalls=_DEFAULTRECALLS,
                   precisions=_DEFAULTPRECISIONS, checkpresence=True, disjoint=True,
-                  binsplit_separator=None, minsize=None, mincontigs=None):
+                  binsplit_separator=None, minsize=None, mincontigs=None, cluster_dir=None):
         contigsof = dict()
         for line in filehandle:
             if line.startswith('#'):
@@ -570,7 +583,7 @@ class Binning:
                 contigsof[bin_name].append(contig_name)
 
         return cls(contigsof, reference, recalls, precisions, checkpresence, disjoint,
-                   binsplit_separator, minsize, mincontigs)
+                   binsplit_separator, minsize, mincontigs, cluster_dir)
 
     def print_matrix(self, rank, file=_sys.stdout):
         """Prints the recall/precision number of bins to STDOUT."""

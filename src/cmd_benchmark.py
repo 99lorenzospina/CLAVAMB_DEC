@@ -51,6 +51,7 @@ binning = vamb.benchmark.Binning(
     minsize=args.min_bin_size,
     disjoint=args.disjoint,
     binsplit_separator=args.separator,
+    cluster_dir = os.path.dirname(args.clusterspath),
 )
 
 for rank in range(len(binning.counters)):
