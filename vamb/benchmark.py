@@ -62,6 +62,8 @@ from itertools import product as _product
 import sys as _sys
 from math import sqrt as _sqrt
 import vamb.vambtools as _vambtools
+import json
+import os
 
 class Contig:
     """An object representing a contig mapping to a subject at position start:end.
@@ -457,8 +459,6 @@ class Binning:
                 f.close()
         seen = self._getseen(recprecof)
 
-        import json
-        import os
         json_file_path = os.path.join(self.cluster_dir, 'recprecof.json')
         with open(json_file_path, 'w') as json_file:
             json.dump(recprecof, json_file)
@@ -591,12 +591,16 @@ class Binning:
         if rank >= len(self.counters):
             raise IndexError("Taxonomic rank out of range")
 
-        print('\tRecall', file=file)
-        print('Prec.', '\t'.join([str(r) for r in self.recalls]), sep='\t', file=file)
+        namefile = str(rank) + ".tsv"
+        filepath = os.path.join(self.cluster_dir, namefile)
 
-        for min_precision in self.precisions:
-            row = [self.counters[rank][(min_recall, min_precision)] for min_recall in self.recalls]
-            print(min_precision, '\t'.join([str(i) for i in row]), sep='\t', file=file)
+        with open(filepath, 'w') as tsv_file:
+            tsv_file.write('\tRecall\n')
+            tsv_file.write('Prec.\t{}\n'.format('\t'.join(map(str, self.recalls))))
+
+            for min_precision in self.precisions:
+                row = [self.counters[rank][(min_recall, min_precision)] for min_recall in self.recalls]
+                tsv_file.write('{}\t{}\n'.format(min_precision, '\t'.join(map(str, row))))
 
     def __repr__(self):
         fields = (self.ncontigs, self.reference.ncontigs, hex(id(self.reference)))
