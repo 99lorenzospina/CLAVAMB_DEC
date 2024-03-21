@@ -595,12 +595,25 @@ class Binning:
         filepath = os.path.join(self.cluster_dir, namefile)
 
         with open(filepath, 'w') as tsv_file:
+            if rank==0:
+                tsv_file.write('strain')
+            if rank==1:
+                tsv_file.write('species')
+            if rank==2:
+                tsv_file.write('genus')
             tsv_file.write('\tRecall\n')
             tsv_file.write('Prec.\t{}\n'.format('\t'.join(map(str, self.recalls))))
 
             for min_precision in self.precisions:
                 row = [self.counters[rank][(min_recall, min_precision)] for min_recall in self.recalls]
                 tsv_file.write('{}\t{}\n'.format(min_precision, '\t'.join(map(str, row))))
+        
+        print('\tRecall', file=file)
+        print('Prec.', '\t'.join([str(r) for r in self.recalls]), sep='\t', file=file)
+
+        for min_precision in self.precisions:
+            row = [self.counters[rank][(min_recall, min_precision)] for min_recall in self.recalls]
+            print(min_precision, '\t'.join([str(i) for i in row]), sep='\t', file=file)
 
     def __repr__(self):
         fields = (self.ncontigs, self.reference.ncontigs, hex(id(self.reference)))
