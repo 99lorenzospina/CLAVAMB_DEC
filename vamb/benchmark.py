@@ -433,9 +433,13 @@ class Binning:
         "Given a 'seen' dict, make a dict of counts at each threshold level"
         nsums = (len(self.recalls) * len(self.precisions))
         sums = [0] * nsums
-        for v in seen.values():
+        for s in seen.keys():
+            v = seen[s]
             for i in range(nsums):
-                sums[i] += (v >> i) & 1 == 1
+                toadd = (v >> i) & 1 == 1
+                sums[i] += toadd
+                if i == 61 and toadd:   #NC bin detected, print the correspondent OTU
+                    print(s)
 
         for i, (recall, precision) in enumerate(_product(self.recalls, self.precisions)):
             counts[(recall, precision)] = sums[i]
@@ -475,7 +479,7 @@ class Binning:
                 newseen[newclade] = newseen.get(newclade, 0) | v
             seen = newseen
         self._accumulate(seen, counts[-1])
-        
+            
         return counts
 
     def __init__(self, contigsof, reference, recalls=_DEFAULTRECALLS,
@@ -586,7 +590,7 @@ class Binning:
                    binsplit_separator, minsize, mincontigs, cluster_dir)
 
     def print_matrix(self, rank, file=_sys.stdout):
-        """Prints the recall/precision number of bins to STDOUT."""
+        """Prints the recall/precision number of bins to STDOUT and in proper files."""
 
         if rank >= len(self.counters):
             raise IndexError("Taxonomic rank out of range")
