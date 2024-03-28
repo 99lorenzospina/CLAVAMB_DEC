@@ -438,8 +438,8 @@ class Binning:
             for i in range(nsums):
                 toadd = (v >> i) & 1 == 1
                 sums[i] += toadd
-                if i == 61 and toadd:   #NC bin detected, print the correspondent OTU
-                    print(s)
+                '''if i == 61 and toadd:   #NC bin detected, print the correspondent OTU
+                    print(s)'''
 
         for i, (recall, precision) in enumerate(_product(self.recalls, self.precisions)):
             counts[(recall, precision)] = sums[i]
