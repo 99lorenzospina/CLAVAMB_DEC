@@ -25,7 +25,7 @@ from typing import Optional
 from vamb.encode import AutomaticWeightedLoss, set_batchsize
 import vamb.vambtools
 
-random_seed = 0
+random_seed = 1111111110
 torch.manual_seed(random_seed)
 torch.cuda.manual_seed(random_seed)
 torch.backends.cudnn.deterministic = True
